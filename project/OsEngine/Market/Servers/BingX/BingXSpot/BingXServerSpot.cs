@@ -2,6 +2,7 @@
 using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Logging;
+using OsEngine.Logging;
 using OsEngine.Market.Servers.BingX.BingXSpot.Entity;
 using OsEngine.Market.Servers.Entity;
 using RestSharp;
