@@ -236,9 +236,9 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newSecurity.Lot = 1;
                         newSecurity.State = SecurityStateType.Activ;
                         newSecurity.Decimals = DigitsAfterComma(price);
-                        newSecurity.PriceStep = 1;// (CalculatePriceStep(price)).ToString().ToDecimal();/*newSecurity.Decimals.GetValueByDecimals();*/
-                        newSecurity.PriceStepCost = newSecurity.PriceStep; //(newSecurity.PriceStep) * (price).ToDecimal();
-                        newSecurity.DecimalsVolume = DigitsAfterComma(volume);//кол-во знаков после запятой  объем инструмента
+                        newSecurity.PriceStep = CalculatePriceStep(price).ToString().ToDecimal();//1;                                                     // (CalculatePriceStep(price)).ToString().ToDecimal();/*newSecurity.Decimals.GetValueByDecimals();*/
+                        newSecurity.PriceStepCost = newSecurity.PriceStep;                             //(newSecurity.PriceStep) * (price).ToDecimal();
+                        newSecurity.DecimalsVolume = DigitsAfterComma(volume);                       //кол-во знаков после запятой  объем инструмента
                         newSecurity.MinTradeAmount = GetMinSize(symbol);
 
                         securities.Add(newSecurity);
@@ -257,25 +257,33 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             }
         }
+        // Метод для расчета шага цены на основе количества знаков после запятой или точки
         public double CalculatePriceStep(string price)
         {
-            // Преобразуем цену в строку
-            // string priceString = price.ToString("G20"); // Максимальная точность для числа
+            // Проверяем входную строку на пустоту или null
+            if (string.IsNullOrWhiteSpace(price))
+            {
+                throw new ArgumentException("Price cannot be null or empty.");
+            }
+
             int decimalPlaces = 0;
 
-            // Если есть точка или запятая, вычисляем количество знаков после нее
+            // Если есть точка, вычисляем количество знаков после нее
             if (price.Contains("."))
             {
+                // Разделяем строку на части до и после точки, и измеряем длину части после точки
                 decimalPlaces = price.Split('.')[1].Length;
             }
+            // Если есть запятая, аналогичная логика
             else if (price.Contains(","))
             {
                 decimalPlaces = price.Split(',')[1].Length;
             }
 
-            // Шаг цены
+            // Вычисляем шаг цены как 10 в степени -количество_знаков
             return Math.Pow(10, -decimalPlaces);
         }
+
 
         private int DigitsAfterComma(string valueNumber)
         {
