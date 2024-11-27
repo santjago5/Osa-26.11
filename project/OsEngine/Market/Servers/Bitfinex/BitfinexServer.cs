@@ -318,7 +318,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         public Dictionary<string, decimal> minSizes = new Dictionary<string, decimal>();
         public void RequestMinSizes()
         {
-            
+
             string _apiPatch = "/v2/conf/pub:info:pair"; //для спота
             //string _apiPatch = "/v2/conf/pub:info:pair:futures";//для фьючерсов
             var client = new RestClient(_baseUrl);
@@ -365,7 +365,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
                 catch (Exception ex)
                 {
-                   SendLogMessage($"Error : {ex.Message}", LogMessageType.Error);
+                    SendLogMessage($"Error : {ex.Message}", LogMessageType.Error);
                 }
             }
             else
@@ -1111,7 +1111,8 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public event Action<MarketDepth> MarketDepthEvent;
 
-        private MarketDepth marketDepth = new MarketDepth();
+        //   private  MarketDepth marketDepth = new MarketDepth();
+        private List<MarketDepth> marketDepths;
         List<MarketDepthLevel> ascs = new List<MarketDepthLevel>();
         List<MarketDepthLevel> bids = new List<MarketDepthLevel>();
 
@@ -1126,23 +1127,43 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             return null; // Или любое другое значение по умолчанию
         }
- 
+
         // Класс для хранения уровня стакана
-       
+
 
         // Метод для обработки снапшота стакана
         public void SnapshotDepth(string jsonResponse)
         {
+            //Очистим предыдущие данные стакана
+            //marketDepths.Clear();
+            //marketDepths.Clear();
+
             JArray root = JArray.Parse(jsonResponse);
 
-             string channelId = root[0].ToString();
+            string channelId = root[0].ToString();
             JArray snapshot = (JArray)root[1];
 
 
             string symbol = GetSymbolByKeyInDepth(channelId);
 
-            marketDepth.SecurityNameCode = symbol;
-          
+
+            if (marketDepths == null)
+            {
+                marketDepths = new List<MarketDepth>();
+            }
+
+            var needDepth = marketDepths.Find(depth =>
+                depth.SecurityNameCode == symbol);
+
+            if (needDepth == null)
+            {
+                needDepth = new MarketDepth();
+                needDepth.SecurityNameCode = symbol;
+                marketDepths.Add(needDepth);
+            }
+
+            // marketDepth.SecurityNameCode = symbol;
+
             // Обрабатываем снапшот
             foreach (var entry in snapshot)
             {
@@ -1152,58 +1173,64 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 if (amount > 0) // Биды
                 {
-                    marketDepth.Bids.Add(new MarketDepthLevel
+                    //marketDepth.Bids.Add(new MarketDepthLevel
+                    //{
+                    //    Price = price,
+                    //    Bid = amount,
+
+                    //});
+
+                    bids.Add(new MarketDepthLevel()
                     {
                         Price = price,
                         Bid = amount,
-                        
                     });
-
-                    //bids.Add(new MarketDepthLevel()
-                    //{
-                    //    Bid = Convert.ToDecimal(value[2]),
-                    //    Price = Convert.ToDecimal(value[0]),
-                    //});
                 }
                 else if (amount < 0) // Аски
                 {
-                    marketDepth.Asks.Add(new MarketDepthLevel
+                    //marketDepth.Asks.Add(new MarketDepthLevel
+                    //{
+                    //    Price = price,
+                    //    Ask = Math.Abs(amount) // Объем аска
+                    //});
+
+                    ascs.Add(new MarketDepthLevel()
                     {
                         Price = price,
-                        Ask = Math.Abs(amount) // Объем аска
+                        Ask = Math.Abs(amount)
                     });
                 }
             }
-
-            // Сортируем и обрезаем стакан
-           // TrimAndSortDepth();
+            needDepth.Asks = ascs;
+            needDepth.Bids = bids;
+            needDepth.Time = ServerTime;
+            //Сортируем и обрезаем стакан
+            // TrimAndSortDepth();
 
             // Вызываем событие обновления стакана
-           // MarketDepthEvent?.Invoke(marketDepth/*.GetCopy()*/);
+            //MarketDepthEvent?.Invoke(marketDepth/*.GetCopy()*/);
+            MarketDepthEvent?.Invoke(needDepth/*.GetCopy()*/);
         }
 
         // Метод для сортировки и ограничения размеров стакана
-        private void TrimAndSortDepth()
-        {
-            //// Сортируем биды по убыванию цены
-            //marketDepth.Bids.Sort((b1, b2) => b2.Price.CompareTo(b1.Price));
+        //private void TrimAndSortDepth()
+        //{
+        //    //// Сортируем биды по убыванию цены
+        //    //marketDepth.Bids.Sort((b1, b2) => b2.Price.CompareTo(b1.Price));
 
-            //// Сортируем аски по возрастанию цены
-            //marketDepth.Asks.Sort((a1, a2) => a1.Price.CompareTo(a2.Price));
+        //    //// Сортируем аски по возрастанию цены
+        //    //marketDepth.Asks.Sort((a1, a2) => a1.Price.CompareTo(a2.Price));
 
-            // Обрезаем списки до 25 уровней
-            if (marketDepth.Bids.Count > 25)
-                marketDepth.Bids.RemoveRange(25, marketDepth.Bids.Count - 25);
+        //    // Обрезаем списки до 25 уровней
+        //    if (marketDepth.Bids.Count > 25)
+        //        marketDepth.Bids.RemoveRange(25, marketDepth.Bids.Count - 25);
 
-            if (marketDepth.Asks.Count > 25)
-                marketDepth.Asks.RemoveRange(25, marketDepth.Asks.Count - 25);
-        }
-        
+        //    if (marketDepth.Asks.Count > 25)
+        //        marketDepth.Asks.RemoveRange(25, marketDepth.Asks.Count - 25);
+        //}
+
         public void UpdateDepth(string jsonResponse)
         {
-            // Очистим предыдущие данные стакана
-            //marketDepth.Bids.Clear();
-            //marketDepth.Asks.Clear();
 
             if (jsonResponse == null)
             {
@@ -1212,7 +1239,21 @@ namespace OsEngine.Market.Servers.Bitfinex
             JArray root = JArray.Parse(jsonResponse);  // Парсим строку как массив JSON
 
             string channelId = root[0].ToString();  // Преобразуем элемент в тип long
-            marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(channelId);
+            string symbol = GetSymbolByKeyInDepth(channelId);
+
+            if (marketDepths == null)
+            {
+                return;
+            }
+            var needDepth = marketDepths.Find(depth =>
+                depth.SecurityNameCode == symbol);
+
+            if (needDepth == null)
+            {
+                return;
+            }
+
+
 
             JToken data = root[1];  // Получаем второй элемент массива как JToken (универсальный тип)"[94606, 0, 1]"
 
@@ -1225,34 +1266,64 @@ namespace OsEngine.Market.Servers.Bitfinex
                 if (amount > 0)
                 {
                     // Добавляем или обновляем бид
-                    var existingBid = marketDepth.Bids.Find(b => b.Price == price);
-                    if (existingBid != null)
+                    //var existingBid = marketDepth.Bids.Find(b => b.Price == price);
+                    var needLevel = needDepth.Bids.Find(bid => bid.Price == price);
+                    //if (existingBid != null)
+                    //{
+                    //    // Обновляем существующий бид
+                    //    existingBid.Bid = amount;
+                    //}
+                    if (needLevel == null)  // if there is no such level, add it / если такого уровня нет, добавляем его
                     {
-                        // Обновляем существующий бид
-                        existingBid.Bid = amount;
+                        needDepth.Bids.Add(new MarketDepthLevel()
+                        {
+                            Bid = amount,
+                            Price = price
+                        });
+
+                        needDepth.Bids.Sort((level, depthLevel) => level.Price > depthLevel.Price ? -1 : level.Price < depthLevel.Price ? 1 : 0);
                     }
                     else
                     {
                         // Добавляем новый бид
-                        marketDepth.Bids.Add(new MarketDepthLevel { Price = price, Bid = amount });
+                        // marketDepth.Bids.Add(new MarketDepthLevel { Price = price, Bid = amount });
+                        needLevel.Bid = amount;
                     }
 
                 }
                 else if (amount < 0)
                 {
-                    // Добавляем или обновляем аск
-                    var existingAsk = marketDepth.Asks.Find(a => a.Price == price);
-                    if (existingAsk != null)
+                    //    // Добавляем или обновляем аск
+                    //    var existingAsk = marketDepth.Asks.Find(a => a.Price == price);
+                    //    if (existingAsk != null)
+                    //    {
+                    //        // Обновляем существующий аск
+                    //        existingAsk.Ask = amount;
+                    //    }
+                    //    else
+                    //    {
+                    //        // Добавляем новый аск
+                    //        marketDepth.Asks.Add(new MarketDepthLevel { Price = price, Ask = amount });
+                    //    }
+                    var needLevel = needDepth.Asks.Find(asc => asc.Price == price);
+
+                    if (needLevel == null)  // if there is no such level, add it / если такого уровня нет, добавляем его
                     {
-                        // Обновляем существующий аск
-                        existingAsk.Ask = amount;
+                        needDepth.Asks.Add(new MarketDepthLevel()
+                        {
+                            Ask = Math.Abs(amount),
+                            Price = price
+                        });
+
+                        needDepth.Asks.Sort((level, depthLevel) => level.Price > depthLevel.Price ? 1 : level.Price < depthLevel.Price ? -1 : 0);
                     }
                     else
                     {
-                        // Добавляем новый аск
-                        marketDepth.Asks.Add(new MarketDepthLevel { Price = price, Ask = amount });
+                        needLevel.Ask = Math.Abs(amount);
                     }
+
                 }
+                // return;
             }
             // Если количество == 0, удаляем уровень
             else if (count == 0)
@@ -1260,13 +1331,16 @@ namespace OsEngine.Market.Servers.Bitfinex
                 if (amount == 1)
                 {
                     // Удаляем из бидов
-                    marketDepth.Bids.RemoveAll(b => b.Price == price);
+                    // marketDepth.Bids.RemoveAll(b => b.Price == price);
+                    needDepth.Bids.Remove(needDepth.Bids.Find(level => level.Price == price));
                 }
                 else if (amount == -1)
                 {
                     // Удаляем из асков
-                    marketDepth.Asks.RemoveAll(a => a.Price == price);
+                    // marketDepth.Asks.RemoveAll(a => a.Price == price);
+                    needDepth.Asks.Remove(needDepth.Asks.Find(level => level.Price == price));
                 }
+                //return;
             }
 
 
@@ -1299,21 +1373,25 @@ namespace OsEngine.Market.Servers.Bitfinex
             //marketDepth.Bids.Sort((b1, b2) => b2.Price.CompareTo(b1.Price)); // Сортировка бидов по убыванию
             //marketDepth.Asks.Sort((a1, a2) => a1.Price.CompareTo(a2.Price)); // Сортировка асков по возрастанию
 
-            ///Обрезаем до 25 элементов
+            /// Обрезаем до 25 элементов
             //if (marketDepth.Bids.Count > 25)
             //    marketDepth.Bids = marketDepth.Bids.Take(25).ToList();
             //if (marketDepth.Asks.Count > 25)
             //    marketDepth.Asks = marketDepth.Asks.Take(25).ToList();
 
-            if (marketDepth.Asks.Count == 0 || marketDepth.Bids.Count == 0)
-            {
-                return;
-            }
-            marketDepth.Time = DateTime.UtcNow;
+            //    if (marketDepth.Asks.Count == 0 || marketDepth.Bids.Count == 0)
+            //    {
+            //        return;
+            //    }
+            //marketDepth.Time = DateTime.UtcNow;
 
+            //if (MarketDepthEvent != null)
+            //{
+            //    MarketDepthEvent(marketDepth/*.GetCopy()*/);
+            //}
             if (MarketDepthEvent != null)
             {
-                MarketDepthEvent(marketDepth/*.GetCopy()*/);
+                MarketDepthEvent(needDepth);
             }
         }
 
@@ -1712,67 +1790,124 @@ namespace OsEngine.Market.Servers.Bitfinex
                         JArray root = JArray.Parse(message);
                         JToken secondElement = root[1];
 
-                        if (secondElement is JArray snapshot) //Проверяем, является ли второй элемент массивом(сценарий для снапшота)
+                        // Обработка heartbeat
+                        if (secondElement.Type == JTokenType.String && secondElement.ToString() == "hb")
                         {
-                            if (snapshot.Count > 2 && snapshot[0] is JArray firstEntry)//// Проверяем, состоит ли массив из подмассивов
-                            {
+                            return; // Heartbeat, завершаем обработку
+                        }
 
-                                // Если это массив массивов, анализируем количество элементов в первом подмассиве
+                        // Обработка массива (снапшот или обновление)
+                        if (secondElement is JArray arrayElement)
+                        {
+                            if (arrayElement.Count == 3)
+                            {
+                                UpdateDepth(message); // Обновление стакана
+                            }
+                            else if (arrayElement.Count == 4)
+                            {
+                                UpdateTrade(message); // Обновление трейдов
+                            }
+                            else if (arrayElement.Count > 2 && arrayElement[0] is JArray firstEntry)
+                            {
                                 if (firstEntry.Count == 3)
                                 {
-                                    
-                                    SnapshotDepth(message);
-
+                                    SnapshotDepth(message); // Снапшот стакана
                                 }
                                 else if (firstEntry.Count == 4)
                                 {
-                                    //continue;
+                                    //SnapshotTrades(message); // Снапшот трейдов
                                 }
                             }
                         }
-                        if (secondElement is JArray update)
+                        // Обработка строкового типа
+                        else if (secondElement.Type == JTokenType.String)
                         {
-                            if (secondElement.Type == JTokenType.Array)// Проверяем, является ли второй элемент массивом для обновления данных
+                            if (int.TryParse(root[0]?.ToString(), out int channelId))
                             {
-
-                                if (update.Count == 3)
+                                string messageType = secondElement.ToString();
+                                if (messageType.Contains("te") || (messageType.Contains("tu") && channelId != 0))
                                 {
-                                    // Это обновление стакана
-                                   UpdateDepth(message);
-
-                                }
-                                else if (update.Count == 4)
-                                {
-                                    // Это обновление трейдов
                                     UpdateTrade(message);
                                 }
-                            }
-                        }
-                        // Проверяем, если второй элемент - строка
-                        else if (root[1].Type == JTokenType.String)
-                        {
-
-                            //string chanelId = (root[0].ToString());
-                            string channelIdString = root[0].ToString(); // Конвертация в строку
-                            int channelId = int.Parse(channelIdString);
-
-                            string messageType = secondElement.ToString(); // // Получаем строку
-                            if (messageType == "hb")
-                            {
-                                return;
-                            }
-                            // Обрабатываем тип сообщения 'te' (торговля выполнена) и 'tu' (обновление выполнения торговли) tu содержит id
-                            if (messageType.Contains("te") || (messageType.Contains("tu") && (channelId != 0)))
-                            {
-                                UpdateTrade(message);
+                                else
+                                {
+                                    UpdateMyTrade(message);
+                                }
                             }
                             else
                             {
-                                UpdateMyTrade(message);
+                                Console.WriteLine("Некорректный channelId");
                             }
                         }
                     }
-                }
+
+
+                    //else if (message.Contains("["))
+                    //{
+                    //    JArray root = JArray.Parse(message);
+                    //    JToken secondElement = root[1];
+
+                    //    if (secondElement is JArray snapshot) //Проверяем, является ли второй элемент массивом(сценарий для снапшота)
+                    //    {
+                    //        if (snapshot.Count > 2 && snapshot[0] is JArray firstEntry)//// Проверяем, состоит ли массив из подмассивов
+                    //        {
+
+                    //            // Если это массив массивов, анализируем количество элементов в первом подмассиве
+                    //            if (firstEntry.Count == 3)
+                    //            {
+
+                    //                SnapshotDepth(message);
+
+                    //            }
+                    //            else if (firstEntry.Count == 4)
+                    //            {
+                    //                //continue;
+                    //            }
+                    //        }
+                    //    }
+                    //    if (secondElement is JArray update)
+                    //    {
+                    //        if (secondElement.Type == JTokenType.Array)// Проверяем, является ли второй элемент массивом для обновления данных
+                    //        {
+
+                    //            if (update.Count == 3)
+                    //            {
+                    //                // Это обновление стакана
+                    //                UpdateDepth(message);
+
+                    //            }
+                    //            else if (update.Count == 4)
+                    //            {
+                    //                // Это обновление трейдов
+                    //                UpdateTrade(message);
+                    //            }
+                    //        }
+                    //    }
+                    // Проверяем, если второй элемент - строка
+                    //else if (root[1].Type == JTokenType.String)
+                    //    {
+
+                    //        //string chanelId = (root[0].ToString());
+                    //        string channelIdString = root[0].ToString(); // Конвертация в строку
+                    //        int channelId = int.Parse(channelIdString);
+
+                    //        string messageType = secondElement.ToString(); // // Получаем строку
+                    //        if (messageType == "hb")
+                    //        {
+                    //            return;
+                    //        }
+                    //        // Обрабатываем тип сообщения 'te' (торговля выполнена) и 'tu' (обновление выполнения торговли) tu содержит id
+                    //        if (messageType.Contains("te") || (messageType.Contains("tu") && (channelId != 0)))
+                    //        {
+                    //            UpdateTrade(message);
+                    //        }
+                    //        else
+                    //        {
+                    //            UpdateMyTrade(message);
+                    //        }
+                    //    }
+                //   }
+                  }
 
                 catch (Exception exception)
                 {
