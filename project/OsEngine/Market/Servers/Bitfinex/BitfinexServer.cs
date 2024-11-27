@@ -1,6 +1,6 @@
 ﻿
 
-using Kraken.WebSockets.Messages;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OsEngine.Entity;
@@ -12,6 +12,7 @@ using RestSharp;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
@@ -1116,7 +1117,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         List<MarketDepthLevel> ascs = new List<MarketDepthLevel>();
         List<MarketDepthLevel> bids = new List<MarketDepthLevel>();
 
-        public string GetSymbolByKeyInDepth(string channelId)
+        public string GetSymbolByKeyInDepth(int channelId)
         {
             string symbol = "";
 
@@ -1140,7 +1141,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             JArray root = JArray.Parse(jsonResponse);
 
-            string channelId = root[0].ToString();
+            int channelId = Convert.ToInt32(root[0]);
             JArray snapshot = (JArray)root[1];
 
 
@@ -1229,18 +1230,23 @@ namespace OsEngine.Market.Servers.Bitfinex
         //        marketDepth.Asks.RemoveRange(25, marketDepth.Asks.Count - 25);
         //}
 
-        public void UpdateDepth(string jsonResponse)
+        public void UpdateDepth(string message)
         {
 
-            if (jsonResponse == null)
+            if (message == null)
             {
                 return;
             }
-            JArray root = JArray.Parse(jsonResponse);  // Парсим строку как массив JSON
 
-            string channelId = root[0].ToString();  // Преобразуем элемент в тип long
+            var root = JsonConvert.DeserializeObject<List<object>>(message);
+
+            int channelId = Convert.ToInt32(root[0]);  // Преобразуем элемент в тип long
             string symbol = GetSymbolByKeyInDepth(channelId);
-
+            if (root == null || root.Count < 2)
+            {
+               SendLogMessage("Сообщение имеет недостаточное количество элементов.", LogMessageType.Error);
+                return;
+            }
             if (marketDepths == null)
             {
                 return;
@@ -1253,13 +1259,18 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return;
             }
 
+            var bookEntry = JsonConvert.DeserializeObject<List<object>>(root[1].ToString());
+
+        
+                // Парсим элементы массива BOOK_ENTRY
+                decimal price = bookEntry[0].ToString().ToDecimal();
+                int count = Convert.ToInt32(bookEntry[1].ToString());
+               decimal amount = bookEntry[2].ToString().ToDecimal();
 
 
-            JToken data = root[1];  // Получаем второй элемент массива как JToken (универсальный тип)"[94606, 0, 1]"
-
-            decimal price = data[0].ToString().ToDecimal();
-            decimal count = data[1].ToString().ToDecimal();
-            decimal amount = data[2].ToString().ToDecimal();
+            //decimal price = root[1].ToString().ToDecimal();
+            //decimal count = root[2].ToString().ToDecimal();
+            //int amount =Convert.ToInt32(root[3]);
 
             if (count > 0)   // Если количество > 0, обновляем или добавляем уровень
             {
@@ -1737,8 +1748,10 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         private readonly ConcurrentQueue<string> WebSocketPrivateMessage = new ConcurrentQueue<string>();
 
-        private Dictionary<string, string> tradeDictionary = new Dictionary<string, string>();
-        private Dictionary<string, string> depthDictionary = new Dictionary<string, string>();
+        private Dictionary<int, string> tradeDictionary = new Dictionary<int, string>();
+        private Dictionary<int, string> depthDictionary = new Dictionary<int, string>();
+        int channelIdDepth;
+        int channelIdTrade;
         private void PublicMessageReader()
         {
             Thread.Sleep(1000);
@@ -1776,138 +1789,49 @@ namespace OsEngine.Market.Servers.Bitfinex
                     if (message.Contains("trades"))
                     {
                         BitfinexSubscriptionResponse responseTrade = JsonConvert.DeserializeObject<BitfinexSubscriptionResponse>(message);
-                        tradeDictionary.Add(responseTrade.ChanId, responseTrade.Symbol);
+                        tradeDictionary.Add(Convert.ToInt32(responseTrade.ChanId), responseTrade.Symbol);
+                        channelIdTrade = Convert.ToInt32(responseTrade.ChanId);
                     }
+
 
                     else if (message.Contains("book"))
                     {
                         BitfinexSubscriptionResponse responseDepth = JsonConvert.DeserializeObject<BitfinexSubscriptionResponse>(message);
-                        depthDictionary.Add(responseDepth.ChanId, responseDepth.Symbol);
+                        depthDictionary.Add(Convert.ToInt32(responseDepth.ChanId), responseDepth.Symbol);
+                        channelIdDepth = Convert.ToInt32(responseDepth.ChanId);
                     }
 
-                    else if (message.Contains("["))
+                    // Проверяем, совпадает ли channelId с channelIdDepth
+                    if (message.Contains("[["))
                     {
-                        JArray root = JArray.Parse(message);
-                        JToken secondElement = root[1];
-
-                        // Обработка heartbeat
-                        if (secondElement.Type == JTokenType.String && secondElement.ToString() == "hb")
+                        var root = JsonConvert.DeserializeObject<List<object>>(message);
+                        int channelId = Convert.ToInt32(root[0]);
+                        if (root == null || root.Count < 2)
                         {
-                            return; // Heartbeat, завершаем обработку
+                            SendLogMessage("Некорректный формат сообщения: недостаточно элементов.", LogMessageType.Error);
+                            return;
                         }
 
-                        // Обработка массива (снапшот или обновление)
-                        if (secondElement is JArray arrayElement)
+                        // Проверяем, является ли второй элемент массивом массивов (снапшотом стакана)
+                        if (channelId == channelIdDepth)
                         {
-                            if (arrayElement.Count == 3)
-                            {
-                                UpdateDepth(message); // Обновление стакана
-                            }
-                            else if (arrayElement.Count == 4)
-                            {
-                                UpdateTrade(message); // Обновление трейдов
-                            }
-                            else if (arrayElement.Count > 2 && arrayElement[0] is JArray firstEntry)
-                            {
-                                if (firstEntry.Count == 3)
-                                {
-                                    SnapshotDepth(message); // Снапшот стакана
-                                }
-                                else if (firstEntry.Count == 4)
-                                {
-                                    //SnapshotTrades(message); // Снапшот трейдов
-                                }
-                            }
-                        }
-                        // Обработка строкового типа
-                        else if (secondElement.Type == JTokenType.String)
-                        {
-                            if (int.TryParse(root[0]?.ToString(), out int channelId))
-                            {
-                                string messageType = secondElement.ToString();
-                                if (messageType.Contains("te") || (messageType.Contains("tu") && channelId != 0))
-                                {
-                                    UpdateTrade(message);
-                                }
-                                else
-                                {
-                                    UpdateMyTrade(message);
-                                }
-                            }
-                            else
-                            {
-                                Console.WriteLine("Некорректный channelId");
-                            }
+                            SnapshotDepth(message); // Вызов метода обработки снапшота стакана
                         }
                     }
-
-
-                    //else if (message.Contains("["))
-                    //{
-                    //    JArray root = JArray.Parse(message);
-                    //    JToken secondElement = root[1];
-
-                    //    if (secondElement is JArray snapshot) //Проверяем, является ли второй элемент массивом(сценарий для снапшота)
-                    //    {
-                    //        if (snapshot.Count > 2 && snapshot[0] is JArray firstEntry)//// Проверяем, состоит ли массив из подмассивов
-                    //        {
-
-                    //            // Если это массив массивов, анализируем количество элементов в первом подмассиве
-                    //            if (firstEntry.Count == 3)
-                    //            {
-
-                    //                SnapshotDepth(message);
-
-                    //            }
-                    //            else if (firstEntry.Count == 4)
-                    //            {
-                    //                //continue;
-                    //            }
-                    //        }
-                    //    }
-                    //    if (secondElement is JArray update)
-                    //    {
-                    //        if (secondElement.Type == JTokenType.Array)// Проверяем, является ли второй элемент массивом для обновления данных
-                    //        {
-
-                    //            if (update.Count == 3)
-                    //            {
-                    //                // Это обновление стакана
-                    //                UpdateDepth(message);
-
-                    //            }
-                    //            else if (update.Count == 4)
-                    //            {
-                    //                // Это обновление трейдов
-                    //                UpdateTrade(message);
-                    //            }
-                    //        }
-                    //    }
-                    // Проверяем, если второй элемент - строка
-                    //else if (root[1].Type == JTokenType.String)
-                    //    {
-
-                    //        //string chanelId = (root[0].ToString());
-                    //        string channelIdString = root[0].ToString(); // Конвертация в строку
-                    //        int channelId = int.Parse(channelIdString);
-
-                    //        string messageType = secondElement.ToString(); // // Получаем строку
-                    //        if (messageType == "hb")
-                    //        {
-                    //            return;
-                    //        }
-                    //        // Обрабатываем тип сообщения 'te' (торговля выполнена) и 'tu' (обновление выполнения торговли) tu содержит id
-                    //        if (messageType.Contains("te") || (messageType.Contains("tu") && (channelId != 0)))
-                    //        {
-                    //            UpdateTrade(message);
-                    //        }
-                    //        else
-                    //        {
-                    //            UpdateMyTrade(message);
-                    //        }
-                    //    }
-                //   }
-                  }
+                    if (!message.Contains("[[") && !message.Contains("te") && !message.Contains("ws") && !message.Contains("event") && !message.Contains("hb"))
+                    {
+                        UpdateDepth(message);
+                    }
+                    if (message.Contains("te") && channelIdTrade != 0)//\"te\",
+                    {
+                        UpdateTrade(message);
+                    }
+ 
+                    else if(message.Contains("[0,\"tu\",[")/*message.Contains("te") && channelIdTrade == 0*/ )
+                    {
+                      UpdateMyTrade(message);
+                    }
+                }
 
                 catch (Exception exception)
                 {
@@ -1915,7 +1839,9 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
             }
         }
-        public string GetSymbolByKeyInTrades(string channelId)
+
+
+        public string GetSymbolByKeyInTrades(int channelId)
         {
             string symbol = "";
 
@@ -1931,7 +1857,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             try
             {
                 JArray root = JArray.Parse(jsonMessage);  // Парсим строку как массив
-                string channelId = root[0].ToString();
+                int channelId = Convert.ToInt32(root[0]);
                 JArray tradeData = root[2] as JArray;
 
                 if (tradeData != null && tradeData.Count >= 4)
