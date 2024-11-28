@@ -1268,10 +1268,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                decimal amount = bookEntry[2].ToString().ToDecimal();
 
 
-            //decimal price = root[1].ToString().ToDecimal();
-            //decimal count = root[2].ToString().ToDecimal();
-            //int amount =Convert.ToInt32(root[3]);
-
             if (count > 0)   // Если количество > 0, обновляем или добавляем уровень
             {
                 if (amount > 0)
@@ -1354,8 +1350,15 @@ namespace OsEngine.Market.Servers.Bitfinex
                 //return;
             }
 
+            // Обрезаем до 25 элементов
+            if (needDepth.Bids.Count > 25)
+                needDepth.Bids = needDepth.Bids.Take(25).ToList();
+            if (needDepth.Asks.Count > 25)
+                needDepth.Asks = needDepth.Asks.Take(25).ToList();
+            //needDepth.Bids = needDepth.Bids.Count > 25 ? needDepth.Bids.Take(25).ToList() : needDepth.Bids;
+            //needDepth.Asks = needDepth.Asks.Count > 25 ? needDepth.Asks.Take(25).ToList() : needDepth.Asks;
 
-            //if (marketDepth.Asks.Count < 2 || marketDepth.Bids.Count < 2)
+            //if (needDepth.Asks.Count < 2 || needDepth.Bids.Count < 2)
             //{
             //    return;
             //}
@@ -1394,12 +1397,8 @@ namespace OsEngine.Market.Servers.Bitfinex
             //    {
             //        return;
             //    }
-            //marketDepth.Time = DateTime.UtcNow;
+            needDepth.Time = DateTime.UtcNow;
 
-            //if (MarketDepthEvent != null)
-            //{
-            //    MarketDepthEvent(marketDepth/*.GetCopy()*/);
-            //}
             if (MarketDepthEvent != null)
             {
                 MarketDepthEvent(needDepth);
