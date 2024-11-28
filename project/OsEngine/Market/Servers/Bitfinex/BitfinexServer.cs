@@ -1112,7 +1112,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public event Action<MarketDepth> MarketDepthEvent;
 
-           private  MarketDepth marketDepth = new MarketDepth();
+        private MarketDepth marketDepth = new MarketDepth();
         private List<MarketDepth> marketDepths;
         //List<MarketDepthLevel> ascs = new List<MarketDepthLevel>();
         //List<MarketDepthLevel> bids = new List<MarketDepthLevel>();
@@ -1223,117 +1223,118 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public void UpdateDepth(string message)
         {
-            if (string.IsNullOrEmpty(message))
-            {
-                SendLogMessage("Пустое сообщение в UpdateDepth.", LogMessageType.Error);
-                return;
-            }
-
-            List<object> root;
             try
             {
+                if (string.IsNullOrEmpty(message))
+                {
+                    SendLogMessage("Пустое сообщение в UpdateDepth.", LogMessageType.Error);
+                    return;
+                }
+
+                List<object> root;
+
                 root = JsonConvert.DeserializeObject<List<object>>(message);
-            }
-            catch (Exception ex)
-            {
-                SendLogMessage($"Ошибка десериализации UpdateDepth: {ex.Message}{ex.Source}. ", LogMessageType.Error);
-                return;
-            }
 
-            if (root == null || root.Count < 2)
-            {
-                SendLogMessage("Некорректное сообщение UpdateDepth: недостаточно элементов.", LogMessageType.Error);
-                return;
-            }
 
-            int channelId = Convert.ToInt32(root[0]);
-            string symbol = GetSymbolByKeyInDepth(channelId);
+                if (root == null || root.Count < 2)
+                {
+                    SendLogMessage("Некорректное сообщение UpdateDepth: недостаточно элементов.", LogMessageType.Error);
 
-            List<object> bookEntry;
-            try
-            {
+                }
+
+                int channelId = Convert.ToInt32(root[0]);
+                string symbol = GetSymbolByKeyInDepth(channelId);
+
+                List<object> bookEntry;
+
                 bookEntry = JsonConvert.DeserializeObject<List<object>>(root[1].ToString());
+
+
+                if (bookEntry == null || bookEntry.Count < 3)
+                {
+                    SendLogMessage("Некорректный bookEntry: недостаточно элементов.", LogMessageType.Error);
+                    return;
+                }
+
+                decimal price = bookEntry[0].ToString().ToDecimal();
+                int count = Convert.ToInt32(bookEntry[1]);
+                decimal amount = bookEntry[2].ToString().ToDecimal();
+
+                if (count > 0)
+                {
+                    if (amount > 0) // Обновление бидов
+                    {
+                        bool updated = false;
+                        for (int i = 0; i < marketDepth.Bids.Count; i++)
+                        {
+                            if (marketDepth.Bids[i].Price == price)
+                            {
+                                marketDepth.Bids[i].Bid = amount;
+                                updated = true;
+                                break;
+                            }
+                        }
+                        if (!updated)
+                        {
+                            marketDepth.Bids.Add(new MarketDepthLevel { Price = price, Bid = amount });
+                        }
+                    }
+                    else if (amount < 0) // Обновление асков
+                    {
+                        bool updated = false;
+                        for (int i = 0; i < marketDepth.Asks.Count; i++)
+                        {
+                            if (marketDepth.Asks[i].Price == price)
+                            {
+                                marketDepth.Asks[i].Ask = Math.Abs(amount);
+                                updated = true;
+                                break;
+                            }
+                        }
+                        if (!updated)
+                        {
+                            marketDepth.Asks.Add(new MarketDepthLevel { Price = price, Ask = Math.Abs(amount) });
+                        }
+                    }
+                }
+                else if (count == 0) // Удаление уровня
+                {
+                    if (amount > 0)
+                    {
+                        marketDepth.Bids.RemoveAll(b => b.Price == price);
+                    }
+                    else if (amount < 0)
+                    {
+                        marketDepth.Asks.RemoveAll(a => a.Price == price);
+                    }
+                }
+
+                // Сортировка уровней
+                marketDepth.Asks.Sort((a1, a2) => a1.Price.CompareTo(a2.Price));
+                marketDepth.Bids.Sort((b1, b2) => b2.Price.CompareTo(b1.Price));
+
+                // Обрезаем списки до 25 уровней
+                TrimDepthLevels();
+
+                // Обновляем время
+                marketDepth.Time = DateTime.UtcNow;
+
+                // Вызываем событие обновления стакана
+                MarketDepthEvent?.Invoke(marketDepth);
             }
+
+
             catch (Exception ex)
             {
-                SendLogMessage($"Ошибка десериализации bookEntry: {ex.Message},{ex.Source}{ex.StackTrace}{ex.ToString()}", LogMessageType.Error);
-                return;
+                SendLogMessage($"Ошибка десериализации bookEntry: {ex.Message}\nСтек вызовов: {ex.StackTrace}", LogMessageType.Error);
+                // Логируем тип и содержимое root[1]
+                //SendLogMessage($"Тип данных: {root[1]?.GetType()}, Содержимое: {root[1]}", LogMessageType.Error);
+                //return;
+
             }
-
-            if (bookEntry == null || bookEntry.Count < 3)
-            {
-                SendLogMessage("Некорректный bookEntry: недостаточно элементов.", LogMessageType.Error);
-                return;
-            }
-
-            decimal price = bookEntry[0].ToString().ToDecimal();
-            int count = Convert.ToInt32(bookEntry[1]);
-            decimal amount = bookEntry[2].ToString().ToDecimal();
-
-            if (count > 0)
-            {
-                if (amount > 0) // Обновление бидов
-                {
-                    bool updated = false;
-                    for (int i = 0; i < marketDepth.Bids.Count; i++)
-                    {
-                        if (marketDepth.Bids[i].Price == price)
-                        {
-                            marketDepth.Bids[i].Bid = amount;
-                            updated = true;
-                            break;
-                        }
-                    }
-                    if (!updated)
-                    {
-                        marketDepth.Bids.Add(new MarketDepthLevel { Price = price, Bid = amount });
-                    }
-                }
-                else if (amount < 0) // Обновление асков
-                {
-                    bool updated = false;
-                    for (int i = 0; i < marketDepth.Asks.Count; i++)
-                    {
-                        if (marketDepth.Asks[i].Price == price)
-                        {
-                            marketDepth.Asks[i].Ask = Math.Abs(amount);
-                            updated = true;
-                            break;
-                        }
-                    }
-                    if (!updated)
-                    {
-                        marketDepth.Asks.Add(new MarketDepthLevel { Price = price, Ask = Math.Abs(amount) });
-                    }
-                }
-            }
-            else if (count == 0) // Удаление уровня
-            {
-                if (amount > 0)
-                {
-                    marketDepth.Bids.RemoveAll(b => b.Price == price);
-                }
-                else if (amount < 0)
-                {
-                    marketDepth.Asks.RemoveAll(a => a.Price == price);
-                }
-            }
-
-            // Сортировка уровней
-            marketDepth.Asks.Sort((a1, a2) => a1.Price.CompareTo(a2.Price));
-            marketDepth.Bids.Sort((b1, b2) => b2.Price.CompareTo(b1.Price));
-
-            // Обрезаем списки до 25 уровней
-            TrimDepthLevels();
-
-            // Обновляем время
-            marketDepth.Time = DateTime.UtcNow;
-
-            // Вызываем событие обновления стакана
-            MarketDepthEvent?.Invoke(marketDepth);
         }
 
-        // Метод для обрезки уровней стакана
+            // Метод для обрезки уровней стакана
         private void TrimDepthLevels()
         {
             if (marketDepth.Bids.Count > 25)
@@ -1909,18 +1910,18 @@ namespace OsEngine.Market.Servers.Bitfinex
                             SnapshotDepth(message); // Вызов метода обработки снапшота стакана
                         }
                     }
-                    if (!message.Contains("[[") && !message.Contains("te") && !message.Contains("ws") && !message.Contains("event") && !message.Contains("hb"))
+                    if (!message.Contains("[[") && !message.Contains("te") && !message.Contains("tu") && !message.Contains("ws") && !message.Contains("event") && !message.Contains("hb"))
                     {
                         UpdateDepth(message);
                     }
-                    if (message.Contains("te") && channelIdTrade != 0)//\"te\",
+                    if ((message.Contains("te") || message.Contains("tu")) && channelIdTrade != 0)//\"te\"
                     {
                         UpdateTrade(message);
                     }
- 
-                    else if(message.Contains("[0,\"tu\",[")/*message.Contains("te") && channelIdTrade == 0*/ )
+
+                    else if (message.Contains("[0,\"tu\",[")/*message.Contains("te") && channelIdTrade == 0*/ )
                     {
-                      UpdateMyTrade(message);
+                        UpdateMyTrade(message);
                     }
                 }
 
@@ -1955,26 +1956,26 @@ namespace OsEngine.Market.Servers.Bitfinex
                     // Десериализуем элемент по индексу 2 как массив объектов
                     var tradeData = JsonConvert.DeserializeObject<List<object>>(root[2].ToString());
 
-                // Парсим строку как массив
-                int channelId = Convert.ToInt32(root[0]);
-             
-
-                if (tradeData != null && tradeData.Count >= 4)
-                {
-                    Trade newTrade = new Trade();
-                    newTrade.SecurityNameCode = GetSymbolByKeyInTrades(channelId);
-                    newTrade.Id = tradeData[0].ToString();   // ID сделки
-                    decimal tradeAmount = tradeData[2].ToString().ToDecimal();// Объём сделки (может быть отрицательным)
-                    newTrade.Price = tradeData[3].ToString().ToDecimal();  // Цена сделки
-                    newTrade.Volume = Math.Abs(tradeAmount); // Абсолютное значение объёма
-                    newTrade.Side = tradeAmount > 0 ? Side.Buy : Side.Sell; // Определяем сторону сделки
-                    newTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(tradeData[1]));
+                    // Парсим строку как массив
+                    int channelId = Convert.ToInt32(root[0]);
 
 
-                    /* ServerTime = newTrade.Time;  */// Временная метка сделки
+                    if (tradeData != null && tradeData.Count >= 4)
+                    {
+                        Trade newTrade = new Trade();
+                        newTrade.SecurityNameCode = GetSymbolByKeyInTrades(channelId);
+                        newTrade.Id = tradeData[0].ToString();   // ID сделки
+                        decimal tradeAmount = tradeData[2].ToString().ToDecimal();// Объём сделки (может быть отрицательным)
+                        newTrade.Price = tradeData[3].ToString().ToDecimal();  // Цена сделки
+                        newTrade.Volume = Math.Abs(tradeAmount); // Абсолютное значение объёма
+                        newTrade.Side = tradeAmount > 0 ? Side.Buy : Side.Sell; // Определяем сторону сделки
+                        newTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(tradeData[1]));
 
-                    NewTradesEvent?.Invoke(newTrade);
-                }
+
+                        /* ServerTime = newTrade.Time;  */// Временная метка сделки
+
+                        NewTradesEvent?.Invoke(newTrade);
+                    }
                     // Если нужна дальнейшая обработка tradeData, она доступна как список объектов
                 }
                 else
