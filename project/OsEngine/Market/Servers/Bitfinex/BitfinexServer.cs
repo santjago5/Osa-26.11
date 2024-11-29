@@ -1114,8 +1114,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         private MarketDepth marketDepth = new MarketDepth();
         private List<MarketDepth> marketDepths;
-        //List<MarketDepthLevel> ascs = new List<MarketDepthLevel>();
-        //List<MarketDepthLevel> bids = new List<MarketDepthLevel>();
+    
 
         public string GetSymbolByKeyInDepth(int channelId)
         {
@@ -1129,10 +1128,10 @@ namespace OsEngine.Market.Servers.Bitfinex
             return null; // Или любое другое значение по умолчанию
         }
        
-      
+     
         public void SnapshotDepth(string message, int currentChannelIdDepth)//336901
-        {  List<MarketDepth> _depths;
-        List<MarketDepthLevel> ascs = new List<MarketDepthLevel>();
+        {  
+            List<MarketDepthLevel> asks = new List<MarketDepthLevel>();
             List<MarketDepthLevel> bids = new List<MarketDepthLevel>();
 
             // Проверка входного сообщения
@@ -1210,34 +1209,29 @@ namespace OsEngine.Market.Servers.Bitfinex
                 if (entry.Count < 3) continue;
 
                 decimal price = entry[0].ToString().ToDecimal();
-                int count = Convert.ToInt32(entry[1]);
+                decimal count = entry[1].ToString().ToDecimal();
                 decimal amount = entry[2].ToString().ToDecimal();
 
                 if (amount > 0) // Биды
                 {
-                    marketDepth.Bids.Add(new MarketDepthLevel
+                    bids.Add(new MarketDepthLevel()
                     {
+                        Bid = amount,
                         Price = price,
-                        Bid = amount
                     });
-
-
-                    //                            bids.Add(new MarketDepthLevel()
-                    //                            {
-                    //                                Bid = Convert.ToDecimal(value[2]),
-                    //                                Price = Convert.ToDecimal(value[0]),
-                    //                            });
                 }
                 else if (amount < 0) // Аски
                 {
-                    marketDepth.Asks.Add(new MarketDepthLevel
+                
+                    asks.Add(new MarketDepthLevel()
                     {
+                        Ask = Math.Abs(amount),
                         Price = price,
-                        Ask = Math.Abs(amount)
                     });
                 }
             }
-
+            marketDepth.Asks = asks;
+            marketDepth.Bids = bids;
             // Устанавливаем время обновления
             marketDepth.Time = DateTime.UtcNow;
 
@@ -1269,6 +1263,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     SendLogMessage("Некорректное сообщение UpdateDepth: недостаточно элементов.", LogMessageType.Error);
 
                 }
+                marketDepth.Time = DateTime.UtcNow;
 
                 int channelId = Convert.ToInt32(root[0]);
 
@@ -1299,7 +1294,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
 
                 decimal price = bookEntry[0].ToString().ToDecimal();
-                int count = Convert.ToInt32(bookEntry[1]);
+                decimal count = bookEntry[1].ToString().ToDecimal();
                 decimal amount = bookEntry[2].ToString().ToDecimal();
 
                 if (count > 0)
@@ -1424,7 +1419,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
 
                 // Обновляем время
-                marketDepth.Time = DateTime.UtcNow;
+               // marketDepth.Time = DateTime.UtcNow;
 
                 // Вызываем событие обновления стакана
                 MarketDepthEvent?.Invoke(marketDepth);
