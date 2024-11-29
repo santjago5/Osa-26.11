@@ -1128,11 +1128,13 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             return null; // Или любое другое значение по умолчанию
         }
+       
+      
+        public void SnapshotDepth(string message, int currentChannelIdDepth)//336901
+        {  List<MarketDepth> _depths;
+        List<MarketDepthLevel> ascs = new List<MarketDepthLevel>();
+            List<MarketDepthLevel> bids = new List<MarketDepthLevel>();
 
-        //private int? currentChannelId = null; // Текущий идентификатор инструмента
-        public void SnapshotDepth(string message,int currentChannelId)
-        {
-           
             // Проверка входного сообщения
             if (string.IsNullOrEmpty(message))
             {
@@ -1154,15 +1156,17 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             MarketDepth marketDepth = new MarketDepth();
             int channelId = Convert.ToInt32(root[0]);
-           
-            if (IsNewInstrument(channelId))
+
+            marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(channelId);
+
+            if (currentChannelIdDepth!=channelId)
             {
                 // Сбрасываем текущий стакан
                 marketDepth.Bids.Clear();
                 marketDepth.Asks.Clear();
 
                 // Устанавливаем новый идентификатор
-                currentChannelId = channelId;
+                currentChannelIdDepth = channelId;
 
                 // Указываем новый код инструмента
                 marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(channelId);
@@ -1170,16 +1174,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage($"Сменился инструмент: {marketDepth.SecurityNameCode}", LogMessageType.Error);
             }
 
-       
-            
             if (root == null || root.Count < 2)
             {
                 SendLogMessage("Некорректное сообщение SnapshotDepth: недостаточно элементов.", LogMessageType.Error);
                 return;
             }
 
-            
-            string symbol = GetSymbolByKeyInDepth(channelId);
 
             List<List<object>> snapshot;
             try
@@ -1203,9 +1203,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 marketDepth = new MarketDepth();
             }
 
-           
-            marketDepth.SecurityNameCode = symbol;
-
             // Обрабатываем снапшот
             for (int i = 0; i < snapshot.Count; i++)
             {
@@ -1223,6 +1220,13 @@ namespace OsEngine.Market.Servers.Bitfinex
                         Price = price,
                         Bid = amount
                     });
+
+
+                    //                            bids.Add(new MarketDepthLevel()
+                    //                            {
+                    //                                Bid = Convert.ToDecimal(value[2]),
+                    //                                Price = Convert.ToDecimal(value[0]),
+                    //                            });
                 }
                 else if (amount < 0) // Аски
                 {
@@ -1241,7 +1245,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             MarketDepthEvent?.Invoke(marketDepth);
         }
 
-        public void UpdateDepth(string message)
+        public void UpdateDepth(string message, int currentChannelIdDepth)
         {
             try
             {
@@ -1250,7 +1254,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                     SendLogMessage("Пустое сообщение в UpdateDepth.", LogMessageType.Error);
                     return;
                 }
-
 
                 if (marketDepth == null)
                 {
@@ -1268,7 +1271,21 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
 
                 int channelId = Convert.ToInt32(root[0]);
-                string symbol = GetSymbolByKeyInDepth(channelId);
+
+                if (currentChannelIdDepth!=channelId)
+                {
+                    // Сбрасываем текущий стакан
+                    marketDepth.Bids.Clear();
+                    marketDepth.Asks.Clear();
+
+                    // Устанавливаем новый идентификатор
+                    currentChannelIdDepth = channelId;
+
+                    // Указываем новый код инструмента
+                    marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(channelId);
+                    marketDepth = new MarketDepth();
+                    SendLogMessage($"Сменился инструмент: {marketDepth.SecurityNameCode}", LogMessageType.Error);
+                }
 
                 List<object> bookEntry;
 
@@ -1424,7 +1441,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-            // Метод для обрезки уровней стакана
+        // Метод для обрезки уровней стакана
         private void TrimDepthLevels()
         {
             if (marketDepth.Bids.Count > 25)
@@ -1934,7 +1951,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         private Dictionary<int, string> tradeDictionary = new Dictionary<int, string>();
         private Dictionary<int, string> depthDictionary = new Dictionary<int, string>();
-        int channelIdDepth;
+        int currentChannelIdDepth;
         int channelIdTrade;
         private void PublicMessageReader()
         {
@@ -1964,7 +1981,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     }
 
 
-                    else if (message.Contains("info") || message.Contains("hb") || message.Contains("auth"))
+                    else if (message.Contains("event") || message.Contains("hb") || message.Contains("auth"))
                     {
                         //continue;
                     }
@@ -1982,7 +1999,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     {
                         BitfinexSubscriptionResponse responseDepth = JsonConvert.DeserializeObject<BitfinexSubscriptionResponse>(message);
                         depthDictionary.Add(Convert.ToInt32(responseDepth.ChanId), responseDepth.Symbol);
-                        channelIdDepth = Convert.ToInt32(responseDepth.ChanId);
+                        currentChannelIdDepth = Convert.ToInt32(responseDepth.ChanId);
                     }
 
                     if (message.Contains("[["))
@@ -1996,15 +2013,18 @@ namespace OsEngine.Market.Servers.Bitfinex
                         }
 
                         // Проверяем, совпадает ли channelId с channelIdDepth
-                        if (channelId == channelIdDepth)
+                        if (channelId == currentChannelIdDepth)
                         {
                             SnapshotDepth(message, channelId); // Вызов метода обработки снапшота стакана
                         }
-                    }
+                      
+
+                    } 
                     if (!message.Contains("[[") && !message.Contains("te") && !message.Contains("tu") && !message.Contains("ws") && !message.Contains("event") && !message.Contains("hb"))
-                    {
-                        UpdateDepth(message);
-                    }
+                        {
+                            UpdateDepth(message, currentChannelIdDepth);
+                        }
+
                     if ((message.Contains("te") || message.Contains("tu")) && channelIdTrade != 0)//\"te\"
                     {
                         UpdateTrade(message);
