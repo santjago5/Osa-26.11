@@ -229,9 +229,11 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
                 }
             }
 
+
             if (oldDepth != null && oldDepth.Time == md.Time)
             {
-                SetNewError("MD Error 13. Time in md is note change");
+                
+                SetNewError($"MD Error 13. Time in md is note change(старый стакан ({oldDepth.SecurityNameCode})-(новый стакан ({md.SecurityNameCode})");
             }
 
             bool isSaved = false;
@@ -305,7 +307,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
                 if (md.Asks[i].Price < md.Asks[i - 1].Price)
                 {
-                    SetNewError("MD Error 20. Asks[i] price < Asks[i-1] price");
+                    SetNewError($"MD Error 20. Asks[i] price < Asks[i-1] price({md.Asks[i].Price}-{md.Asks[i - 1].Price})");
                 }
             }
 
@@ -324,7 +326,8 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
                     if (curLevel.Price == md.Bids[j].Price)
                     {
-                        SetNewError("MD Error 21. bids with same price");
+                        SetNewError($"MD Error 21. bids with same price({ md.SecurityNameCode})-({curLevel.Price})-({md.Bids[j].Price})");
+
                     }
                 }
             }
@@ -344,7 +347,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
                     if (curLevel.Price == md.Asks[j].Price)
                     {
-                        SetNewError("MD Error 22. Asks with same price");
+                        SetNewError($"MD Error 22. Asks with same price({md.SecurityNameCode})-({curLevel.Price})-({ md.Asks[j].Price})");
                     }
                 }
             }
