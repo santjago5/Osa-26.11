@@ -130,6 +130,9 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 _securities.Clear();
                 _portfolios.Clear();
+               
+                tradeDictionary.Clear();///////////1111111111
+                depthDictionary.Clear();//////////11111111111
 
                 DeleteWebSocketConnection();
             }
@@ -1670,10 +1673,17 @@ namespace OsEngine.Market.Servers.Bitfinex
             int channelId = Convert.ToInt32(root[0]);
             if (currentChannelIdDepth != channelId)
             {
+                // Очистка данных снапшота и стакана
                 bidsSnapshot.Clear();
                 asksSnapshot.Clear();
+                //marketDepth.Bids.Clear();
+                //marketDepth.Asks.Clear();
                 currentChannelIdDepth = channelId;
                 marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(channelId);
+
+                SendLogMessage($"СнапшотТекущ{GetSymbolByKeyInDepth(currentChannelIdDepth)}новый {GetSymbolByKeyInDepth(channelId)}" +
+                    $"(new{channelId}:old{currentChannelIdDepth}).", LogMessageType.Error);
+
                 SendLogMessage($"Сменился инструмент: {marketDepth.SecurityNameCode}", LogMessageType.User);
             }
 
@@ -1725,8 +1735,8 @@ namespace OsEngine.Market.Servers.Bitfinex
             asksSnapshot = tempAsks;
 
             // Применение к текущему стакану
-            ApplyDepthChanges(tempBids, tempAsks);
-            //MarketDepthEvent(marketDepth);/////////1
+           // ApplyDepthChanges(tempBids, tempAsks, marketDepth.SecurityNameCode);
+            MarketDepthEvent((marketDepth));/////////1
         }
 
         // Метод для обновления данных глубины рынка
@@ -1762,8 +1772,10 @@ namespace OsEngine.Market.Servers.Bitfinex
             int channelId = Convert.ToInt32(root[0]);
             if (currentChannelIdDepth != channelId)
             {
-                SendLogMessage("Канал сменился. Данные снапшота сохраняются.", LogMessageType.Error);
-                currentChannelIdDepth = channelId;
+                SendLogMessage($"текущ{GetSymbolByKeyInDepth(currentChannelIdDepth)}новый {GetSymbolByKeyInDepth(channelId)}" +
+                    $"(new{channelId}:old{currentChannelIdDepth}).", LogMessageType.Error);
+
+                //currentChannelIdDepth = channelId;
                 marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(channelId);
             }
 
@@ -1801,7 +1813,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
 
             // Применение обновлений
-            ApplyDepthChanges(bidsSnapshot, asksSnapshot);
+            ApplyDepthChanges(bidsSnapshot, asksSnapshot, marketDepth.SecurityNameCode);
         }
 
         // Метод для обновления уровня
@@ -1826,7 +1838,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
 
         // Метод для применения изменений
-        private void ApplyDepthChanges(List<MarketDepthLevel> bids, List<MarketDepthLevel> asks)
+        private void ApplyDepthChanges(List<MarketDepthLevel> bids, List<MarketDepthLevel> asks, string symbol)
         {
             // Сортировка уровней
             bids.Sort((b1, b2) => b2.Price.CompareTo(b1.Price));
@@ -1835,7 +1847,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             // Проверка пересечения цен
             if (bids.Count > 0 && asks.Count > 0 && bids[0].Price >= asks[0].Price)
             {
-                SendLogMessage($"Ошибка пересечения цен: Bid({bids[0].Price}) >= Ask({asks[0].Price})", LogMessageType.Error);
+                SendLogMessage($"Ошибка пересечения цен: Bid({bids[0].Price}:({symbol}) >= Ask({asks[0].Price}:({marketDepth.SecurityNameCode})", LogMessageType.Error);
                 bids.RemoveAt(0);
                 asks.RemoveAt(0);
             }
