@@ -1924,9 +1924,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             int channelId = Convert.ToInt32(root[0]);
             if (currentChannelIdDepth != channelId)
             {
-                // Логируем изменение канала
-               // SendLogMessage($"Канал изменился: текущий {GetSymbolByKeyInDepth(currentChannelIdDepth)}, старый {GetSymbolByKeyInDepth(channelId)}.", LogMessageType.User);
-
+              
                 // Обновляем идентификатор текущего канала
                 currentChannelIdDepth = channelId;
 
@@ -1999,7 +1997,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             // Обновляем текущие данные снапшота
             bidsSnapshot = tempBids;
             asksSnapshot = tempAsks;
-
+            marketDepth.Time = DateTime.Now;
             // Обновляем стакан
             ApplyDepthChanges(bidsSnapshot, asksSnapshot, marketDepth.SecurityNameCode);
         }
@@ -2051,7 +2049,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             // Обновляем данные стакана
             marketDepth.Bids = new List<MarketDepthLevel>(bids);
             marketDepth.Asks = new List<MarketDepthLevel>(asks);
-            marketDepth.Time = DateTime.UtcNow;
+            marketDepth.Time =ServerTime;
 
             // Генерируем событие обновления стакана
             MarketDepthEvent?.Invoke(marketDepth);
@@ -2060,7 +2058,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         // Метод для обработки обновлений глубины рынка
         public void UpdateDepth(string message, int currentChannelIdDepth)
-        {
+        { marketDepth.Time = DateTime.UtcNow;
             // Проверяем, что входное сообщение не пустое
             if (string.IsNullOrEmpty(message))
             {
@@ -2086,14 +2084,23 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage("Некорректное сообщение UpdateDepth: недостаточно элементов.", LogMessageType.Error);
                 return;
             }
-
+           
             // Получаем идентификатор канала
             int channelId = Convert.ToInt32(root[0]);
             marketDepth.SecurityNameCode=GetSymbolByKeyInDepth(channelId);
+
+          //  SendLogMessage($"текущий {GetSymbolByKeyInDepth(currentChannelIdDepth)}, полученный {GetSymbolByKeyInDepth(channelId)}.", LogMessageType.Error);
+            string symbol1 = GetSymbolByKeyInDepth(currentChannelIdDepth);
+
+            string symbol2 = GetSymbolByKeyInDepth(channelId);
+
             if (currentChannelIdDepth != channelId)
             {
+                currentChannelIdDepth = channelId;
+                marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(currentChannelIdDepth);
+                //SendLogMessage($"{currentChannelIdDepth}:{channelId}", LogMessageType.Error);
                 // Логируем несоответствие канала, так как обновления приходят для другого инструмента
-                SendLogMessage($"Несоответствие канала: текущий {GetSymbolByKeyInDepth(currentChannelIdDepth)}, полученный {GetSymbolByKeyInDepth(channelId)}.", LogMessageType.Error);
+                //SendLogMessage($"!!!!!!!!!!!!!!!!1Несоответствие канала: текущий {GetSymbolByKeyInDepth(currentChannelIdDepth)}, полученный {GetSymbolByKeyInDepth(channelId)}.", LogMessageType.Error);
                 return;
             }
 
@@ -2149,6 +2156,8 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             // Применяем изменения к глобальному стакану
             ApplyDepthChanges(bidsSnapshot, asksSnapshot, marketDepth.SecurityNameCode);
+    
+            MarketDepthEvent(marketDepth);
         }
 
         // Метод для обновления уровня (Bid или Ask)
