@@ -1879,17 +1879,17 @@ namespace OsEngine.Market.Servers.Bitfinex
 
 
 
-
-        // Поле для хранения данных стакана
+        private DateTime _lastTimeMd =DateTime.MinValue ;
+       
         private MarketDepth marketDepth = new MarketDepth();
-
-        // Списки для хранения снапшота бидов и асков
+        private Dictionary<string, MarketDepth> _allDepths = new Dictionary<string, MarketDepth>();
+     
         private List<MarketDepthLevel> bidsSnapshot = new List<MarketDepthLevel>();
         private List<MarketDepthLevel> asksSnapshot = new List<MarketDepthLevel>();
-
+         
         // Метод для обработки снапшота глубины рынка
         public void SnapshotDepth(string message, int currentChannelIdDepth)
-        {
+       {
             // Проверяем, что входное сообщение не пустое
             if (string.IsNullOrEmpty(message))
             {
@@ -1918,6 +1918,29 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             int channelId = Convert.ToInt32(root[0]);
             marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(channelId);
+            string symbol = marketDepth.SecurityNameCode;
+
+            //var existingMarketDepth = _allDepths.Find(marketDepth =>
+            //          marketDepth.SecurityNameCode == symbol);
+
+            //if (existingMarketDepth == null)
+            //{
+            //    MarketDepth newMarketDept = new MarketDepth();
+            //    newMarketDepth.SecurityNameCode = symbol;
+            //    newMarketDepth.Add(newMarketDepth);
+            //}
+
+            MarketDepth existingMarketDepth;
+            if (!_allDepths.TryGetValue(symbol, out existingMarketDepth))
+            {
+                // Если запись не существует, создаём новую и добавляем её в словарь
+                existingMarketDepth = new MarketDepth
+                {
+                    SecurityNameCode = symbol
+                };
+                _allDepths.Add(symbol, existingMarketDepth);
+            }
+
            
             if (currentChannelIdDepth != channelId)
             {
@@ -1990,12 +2013,28 @@ namespace OsEngine.Market.Servers.Bitfinex
          
             ApplyDepthChanges(bidsSnapshot, asksSnapshot);
 
-            marketDepth.Time = ServerTime;
+            _allDepths[symbol] = marketDepth;
+
+            marketDepth.Time = DateTime.UtcNow;
 
             if (marketDepth.Time == DateTime.MinValue)
             {
                 marketDepth.Time = DateTime.Now;
             }
+
+
+            //marketDepth.Time = ServerTime;
+            //if (marketDepth.Time < _lastTimeMd)
+            //{
+            //    marketDepth.Time = _lastTimeMd;
+            //}
+            //else if (marketDepth.Time == _lastTimeMd)
+            //{
+            //    _lastTimeMd = DateTime.FromBinary(_lastTimeMd.Ticks + 1);
+            //    marketDepth.Time = _lastTimeMd;
+            //}
+
+            //_lastTimeMd = marketDepth.Time;
 
             MarketDepthEvent?.Invoke(marketDepth);
 
@@ -2048,9 +2087,18 @@ namespace OsEngine.Market.Servers.Bitfinex
             // Обновляем данные стакана
             marketDepth.Bids = new List<MarketDepthLevel>(bids);
             marketDepth.Asks = new List<MarketDepthLevel>(asks);
-           
+
         }
 
+
+    //     if (_lastMdTime != DateTime.MinValue &&
+    //            _lastMdTime >= marketDepth.Time)
+    //        {
+    //            marketDepth.Time = _lastMdTime.AddTicks(1);
+    //        }
+
+    //_lastMdTime = marketDepth.Time;
+       
         // Метод для обработки обновлений глубины рынка
         public void UpdateDepth(string message, int currentChannelIdDepth)
         {
@@ -2082,6 +2130,18 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             int channelId = Convert.ToInt32(root[0]);
             marketDepth.SecurityNameCode=GetSymbolByKeyInDepth(channelId);
+            string symbol = marketDepth.SecurityNameCode;
+
+            MarketDepth existingMarketDepth;
+            if (!_allDepths.TryGetValue(symbol, out existingMarketDepth))
+            {
+                // Если запись не существует, создаём новую и добавляем её в словарь
+                existingMarketDepth = new MarketDepth
+                {
+                    SecurityNameCode = symbol
+                };
+                _allDepths.Add(symbol, existingMarketDepth);
+            }
 
 
             if (currentChannelIdDepth != channelId)
@@ -2145,8 +2205,24 @@ namespace OsEngine.Market.Servers.Bitfinex
             // Применяем изменения к глобальному стакану
             ApplyDepthChanges(bidsSnapshot, asksSnapshot);
 
-            marketDepth.Time = ServerTime;
+            //marketDepth.Time = ServerTime;
 
+            //_lastTimeMd = ServerTime;
+            existingMarketDepth.Time = DateTime.UtcNow;
+
+            //if (marketDepth.Time < _lastTimeMd)
+            //{
+            //    marketDepth.Time = _lastTimeMd;
+            //}
+            //else if (marketDepth.Time == _lastTimeMd)
+            //{
+            //    _lastTimeMd = DateTime.FromBinary(_lastTimeMd.Ticks + 1);
+            //    marketDepth.Time = _lastTimeMd;
+            //}
+
+            //_lastTimeMd = marketDepth.Time;
+            //marketDepth.Time = _lastTimeMd;
+            _allDepths[symbol] = marketDepth;
             MarketDepthEvent(marketDepth);
         }
 
