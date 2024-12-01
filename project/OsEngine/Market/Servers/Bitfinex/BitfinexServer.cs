@@ -2377,7 +2377,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             GenerateAuthenticate();
             _socketPrivateIsActive = true;//отвечает за соединение
-            //CheckActivationSockets();/////// надо или нет
+            //CheckActivationSockets();
             SendLogMessage("Connection to private data is Open", LogMessageType.System);
         }
 
@@ -2711,7 +2711,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                         NewTradesEvent?.Invoke(newTrade);
                     }
-                    // Если нужна дальнейшая обработка tradeData, она доступна как список объектов
+                    
                 }
                 else
                 {
@@ -3359,12 +3359,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
 
         public List<Order> GetAllOrdersFromExchange()
-        {//получить все активные ордера
-         //  public List<Order> GetAllOrdersFromExchange(int? id = null) 
-         //       string _apiPath = id.HasValue
-         //? $"v2/auth/r/order/{id.Value}" // Если передан ID
-         //: "v2/auth/r/orders";
-         //      тело запроса, если есть id  {\"id\":[54564]}
+        {
 
             // post https://api.bitfinex.com/v2/auth/r/orders
 
@@ -3511,7 +3506,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        private Order GetOrderFromExchange(string numberMarket)//184072834570
+        private Order GetOrderFromExchange(string numberMarket)
         {
             string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
             string _apiPath = "v2/auth/r/orders";
