@@ -326,7 +326,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
                     if (curLevel.Price == md.Bids[j].Price)
                     {
-                        SetNewError($"MD Error 21. bids with same price({ md.SecurityNameCode})-({curLevel.Price})-({md.Bids[j].Price})");
+                        SetNewError($"MD Error 21. Bids with same price({ md.SecurityNameCode})-({curLevel.Price})-({md.Bids[j].Price})");//с маленькой буквы
 
                     }
                 }

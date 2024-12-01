@@ -1115,12 +1115,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public event Action<MarketDepth> MarketDepthEvent;
 
-        //private MarketDepth marketDepth = new MarketDepth();
-
-
-        //List<MarketDepthLevel> asksSnapshot = new List<MarketDepthLevel>();
-        //List<MarketDepthLevel> bidsSnapshot = new List<MarketDepthLevel>();
-
+       
         public string GetSymbolByKeyInDepth(int channelId)
         {
             string symbol = "";
@@ -1920,11 +1915,11 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return;
             }
 
-            // Обновляем текущий канал и инструмент, если они изменились
             int channelId = Convert.ToInt32(root[0]);
+            marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(channelId);
+           
             if (currentChannelIdDepth != channelId)
             {
-              
                 // Обновляем идентификатор текущего канала
                 currentChannelIdDepth = channelId;
 
@@ -2065,8 +2060,9 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         // Метод для обработки обновлений глубины рынка
         public void UpdateDepth(string message, int currentChannelIdDepth)
-        {// marketDepth.Time = ServerTime;
-            // Проверяем, что входное сообщение не пустое
+        {
+            marketDepth.Time = ServerTime;
+          
             if (string.IsNullOrEmpty(message))
             {
                 SendLogMessage("Пустое сообщение в UpdateDepth.", LogMessageType.Error);
@@ -2085,14 +2081,11 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return;
             }
 
-            // Проверяем, что данные корректны
             if (root == null || root.Count < 2)
             {
                 SendLogMessage("Некорректное сообщение UpdateDepth: недостаточно элементов.", LogMessageType.Error);
                 return;
             }
-           
-            // Получаем идентификатор канала
             int channelId = Convert.ToInt32(root[0]);
             marketDepth.SecurityNameCode=GetSymbolByKeyInDepth(channelId);
 
