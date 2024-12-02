@@ -1133,22 +1133,404 @@ namespace OsEngine.Market.Servers.Bitfinex
         private DateTime _lastTimeMd =DateTime.MinValue ;
 
         private MarketDepth marketDepth = new MarketDepth();
-        private Dictionary<int, MarketDepth> _allDepths = new Dictionary<int, MarketDepth>();
+      //  private Dictionary<int, MarketDepth> _allDepths = new Dictionary<int, MarketDepth>();
 
         private List<MarketDepthLevel> bidsSnapshot = new List<MarketDepthLevel>();
         private List<MarketDepthLevel> asksSnapshot = new List<MarketDepthLevel>();
 
-        // Метод для обработки снапшота глубины рынка
-        public void SnapshotDepth(string message, int currentChannelIdDepth)//(AddSnapshotToDictionary)
+        //public void AddOrUpdateSnapshot(int snapshotId, MarketDepth marketDepth)
+        //{
+        //    // Проверяем, существует ли уже такой снапшот в словаре
+        //    if (_allDepths.ContainsKey(snapshotId))
+        //    {
+        //        // Если существует, перезаписываем значение
+        //        _allDepths[snapshotId] = marketDepth;
+        //    }
+        //    else
+        //    {
+        //        // Если не существует, добавляем новый
+        //        _allDepths.Add(snapshotId, marketDepth);
+        //    }
+        //}
+        //// Метод для обработки снапшота глубины рынка
+        //public void SnapshotDepth(string message, int currentChannelIdDepth)//(AddSnapshotToDictionary)
+        //{
+        //    // Проверяем, что входное сообщение не пустое
+        //    if (string.IsNullOrEmpty(message))
+        //    {
+        //        SendLogMessage("Пустое сообщение в SnapshotDepth.", LogMessageType.Error);
+        //        return;
+        //    }
+
+        //    // Десериализуем входное сообщение
+        //    List<object> root;
+        //    try
+        //    {
+        //        root = JsonConvert.DeserializeObject<List<object>>(message);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        SendLogMessage($"Ошибка десериализации SnapshotDepth: {ex.Message}", LogMessageType.Error);
+        //        return;
+        //    }
+
+        //    // Проверяем, что десериализованные данные корректны
+        //    if (root == null || root.Count < 2)
+        //    {
+        //        SendLogMessage("Некорректное сообщение SnapshotDepth: недостаточно элементов.", LogMessageType.Error);
+        //        return;
+        //    }
+
+        //    int channelId = Convert.ToInt32(root[0]);
+        //    marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(channelId);
+        //    string symbol = marketDepth.SecurityNameCode;
+
+
+        //    if (currentChannelIdDepth != channelId)
+        //    {
+        //        // Обновляем идентификатор текущего канала
+        //        currentChannelIdDepth = channelId;
+
+        //        // Обновляем название инструмента
+        //        marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(currentChannelIdDepth);
+
+        //        // Очищаем данные стакана
+        //        //bidsSnapshot.Clear(); // Очищаем список бидов
+        //        //asksSnapshot.Clear(); // Очищаем список асков
+        //        //marketDepth.Bids.Clear(); // Очищаем глобальный стакан бидов
+        //        //marketDepth.Asks.Clear(); // Очищаем глобальный стакан асков
+
+        //        return;
+        //    }
+
+
+        //    // Десериализуем данные снапшота
+        //    List<List<object>> snapshot;
+        //    try
+        //    {
+        //        snapshot = JsonConvert.DeserializeObject<List<List<object>>>(root[1].ToString());
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        SendLogMessage($"Ошибка десериализации снапшота: {ex.Message}", LogMessageType.Error);
+        //        return;
+        //    }
+
+        //    // Проверяем, что снапшот не пустой
+        //    if (snapshot == null)
+        //    {
+        //        SendLogMessage("Снапшот пустой.", LogMessageType.Error);
+        //        return;
+        //    }
+
+        //    // Временные списки для обновления бидов и асков
+        //    List<MarketDepthLevel> tempBids = new List<MarketDepthLevel>();
+        //    List<MarketDepthLevel> tempAsks = new List<MarketDepthLevel>();
+
+        //    // Обрабатываем каждый уровень снапшота
+        //    for (int i = 0; i < snapshot.Count; i++)
+        //    {
+        //        var entry = snapshot[i];
+
+        //        // Проверяем, что в уровне достаточно данных
+        //        if (entry.Count < 3) continue;
+
+        //        // Парсим цену, количество и объём
+        //        decimal price = entry[0].ToString().ToDecimal();
+        //        decimal count = entry[1].ToString().ToDecimal();
+        //        decimal amount = entry[2].ToString().ToDecimal();
+
+        //        // Разделяем данные на биды и аски
+        //        if (amount > 0)
+        //        {
+        //            tempBids.Add(new MarketDepthLevel { Price = price, Bid = amount });
+        //        }
+        //        else if (amount < 0)
+        //        {
+        //            tempAsks.Add(new MarketDepthLevel { Price = price, Ask = Math.Abs(amount) });
+        //        }
+        //    }
+
+
+        //    if (!_allDepths.TryGetValue(channelId, out marketDepth))
+        //    {
+        //        // Создаем новый объект, если он не существует
+        //        marketDepth = new MarketDepth
+        //        {
+        //            SecurityNameCode = symbol,
+        //            Bids = new List<MarketDepthLevel>(),
+        //            Asks = new List<MarketDepthLevel>()
+        //        };
+        //        _allDepths.Add(channelId, marketDepth);
+        //        marketDepth.Time = DateTime.UtcNow;
+        //    }
+
+        //    // Обновляем текущие данные снапшота
+        //    bidsSnapshot = tempBids;
+        //    asksSnapshot = tempAsks;
+
+
+
+        //    ApplyDepthChanges(bidsSnapshot, asksSnapshot);
+
+        //    // _allDepths[symbol] = marketDepth;
+
+        //    marketDepth.Time = DateTime.UtcNow;
+
+        //    if (marketDepth.Time < _lastTimeMd)
+        //    {
+        //        marketDepth.Time = _lastTimeMd;
+        //    }
+        //    else if (marketDepth.Time == _lastTimeMd)
+        //    {
+        //        _lastTimeMd = DateTime.FromBinary(_lastTimeMd.Ticks + 1);
+        //        marketDepth.Time = _lastTimeMd;
+        //    }
+
+        //    _lastTimeMd = marketDepth.Time;
+
+        //    MarketDepthEvent?.Invoke(marketDepth);
+
+        //}
+
+
+
+
+        //public void UpdateDepth(string message, int currentChannelIdDepth)
+        //{
+        //    if (string.IsNullOrEmpty(message))
+        //    {
+        //        return;
+        //    }
+
+        //    // Десериализуем входное сообщение
+        //    List<object> root;
+        //    try
+        //    {
+        //        root = JsonConvert.DeserializeObject<List<object>>(message);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        SendLogMessage($"Ошибка десериализации UpdateDepth: {ex.Message}", LogMessageType.Error);
+        //        return;
+        //    }
+
+        //    if (root == null || root.Count < 2)
+        //    {
+        //        SendLogMessage("Некорректное сообщение UpdateDepth: недостаточно элементов.", LogMessageType.Error);
+        //        return;
+        //    }
+
+        //    // Получаем идентификатор канала и символ
+        //    int channelId = Convert.ToInt32(root[0]);
+        //    string symbol = GetSymbolByKeyInDepth(channelId);
+
+        //    //// Если канал изменился, очищаем данные только для текущего символа
+        //    //if (currentChannelIdDepth != channelId)
+        //    //{
+        //    //    currentChannelIdDepth = channelId;
+
+        //    //    if (!_allDepths.TryGetValue(currentChannelIdDepth, out MarketDepth marketDepth))
+        //    //    {
+        //    //        marketDepth = new MarketDepth
+        //    //        {
+        //    //            SecurityNameCode = symbol,
+        //    //            Bids = new List<MarketDepthLevel>(),
+        //    //            Asks = new List<MarketDepthLevel>()
+        //    //        };
+        //    //        _allDepths[channelId] = marketDepth;
+        //    //    }
+
+        //    //    marketDepth.Bids.Clear();
+        //    //    marketDepth.Asks.Clear();
+        //    //    marketDepth.Time = DateTime.UtcNow;
+
+        //    //    return;
+        //    //}
+
+        //    // Получаем объект MarketDepth для текущего канала
+        //    if (!_allDepths.TryGetValue(channelId, out MarketDepth currentMarketDepth))
+        //    {
+        //        currentMarketDepth = new MarketDepth
+        //        {
+        //            SecurityNameCode = symbol,
+        //            Bids = new List<MarketDepthLevel>(),
+        //            Asks = new List<MarketDepthLevel>(),
+        //            Time = DateTime.UtcNow
+        //        };
+        //        _allDepths[channelId] = currentMarketDepth;
+        //    }
+
+        //    // Десериализуем данные обновления
+        //    List<object> bookEntry;
+        //    try
+        //    {
+        //        bookEntry = JsonConvert.DeserializeObject<List<object>>(root[1].ToString());
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        SendLogMessage($"Ошибка десериализации обновления: {ex.Message}", LogMessageType.Error);
+        //        return;
+        //    }
+
+        //    if (bookEntry == null || bookEntry.Count < 3)
+        //    {
+        //        SendLogMessage("Некорректный bookEntry: недостаточно элементов.", LogMessageType.Error);
+        //        return;
+        //    }
+
+        //    // Парсим данные обновления
+        //    decimal price = bookEntry[0].ToString().ToDecimal();
+        //    decimal count = bookEntry[1].ToString().ToDecimal();
+        //    decimal amount = bookEntry[2].ToString().ToDecimal();
+
+        //    // Обрабатываем обновление
+        //    if (count > 0)
+        //    {
+        //        if (amount > 0)
+        //        {
+        //            UpdateLevel(currentMarketDepth.Bids, price, amount, true); // Обновляем/добавляем в Bids
+        //        }
+        //        else
+        //        {
+        //            UpdateLevel(currentMarketDepth.Asks, price, Math.Abs(amount), false); // Обновляем/добавляем в Asks
+        //        }
+        //    }
+        //    else if (count == 0)
+        //    {
+        //        if (amount > 0)
+        //        {
+        //            RemoveLevel(currentMarketDepth.Bids, price); // Удаляем из Bids
+        //        }
+        //        else if (amount <0)
+        //        {
+        //            RemoveLevel(currentMarketDepth.Asks, price); // Удаляем из Asks
+        //        }
+        //    }
+
+        //    // Применяем изменения и обновляем время
+        //    ApplyDepthChanges(currentMarketDepth.Bids, currentMarketDepth.Asks);
+        //    // currentMarketDepth.Time = DateTime.UtcNow;
+
+        //    marketDepth.Time = DateTime.UtcNow;
+
+        //    if (marketDepth.Time < _lastTimeMd)
+        //    {
+        //        marketDepth.Time = _lastTimeMd;
+        //    }
+        //    else if (marketDepth.Time == _lastTimeMd)
+        //    {
+        //        _lastTimeMd = DateTime.FromBinary(_lastTimeMd.Ticks + 1);
+        //        marketDepth.Time = _lastTimeMd;
+        //    }
+
+        //    _lastTimeMd = marketDepth.Time;
+
+        //    // Вызываем событие
+        //    MarketDepthEvent?.Invoke(currentMarketDepth);
+
+        //}
+        //private void ApplyDepthChanges(List<MarketDepthLevel> bids, List<MarketDepthLevel> asks)
+        //{
+        //    // Сортируем биды по убыванию цены
+        //    bids.Sort((a, b) => b.Price.CompareTo(a.Price));
+
+        //    // Сортируем аски по возрастанию цены
+        //    asks.Sort((a, b) => a.Price.CompareTo(b.Price));
+
+        //    // Проверяем пересечение цен
+        //    if (bids.Count > 0 && asks.Count > 0 && bids[0].Price >= asks[0].Price)
+        //    {
+        //        SendLogMessage($"Ошибка пересечения цен: Bid({bids[0].Price}) >= Ask({asks[0].Price}).", LogMessageType.Error);
+        //        bids.RemoveAt(0); // Удаляем конфликтный бид
+        //        asks.RemoveAt(0); // Удаляем конфликтный аск
+        //    }
+
+        //    // Ограничиваем количество уровней
+        //    const int MaxLevels = 25;
+        //    if (bids.Count > MaxLevels) bids.RemoveRange(MaxLevels, bids.Count - MaxLevels);
+        //    if (asks.Count > MaxLevels) asks.RemoveRange(MaxLevels, asks.Count - MaxLevels);
+
+        //    ValidateDepthOrder(bids, asks);
+        //}
+
+
+        //private void UpdateLevel(List<MarketDepthLevel> levels, decimal price, decimal amount, bool isBid)
+        //{
+        //    // Проверяем, если уровень с такой ценой уже существует
+        //    var existingLevel = levels.FirstOrDefault(level => level.Price == price);
+        //    if (existingLevel != null)
+        //    {
+        //        // Если существует, обновляем его
+        //        if (isBid)
+        //        {
+        //            existingLevel.Bid = amount;
+        //        }
+        //        else
+        //        {
+        //            existingLevel.Ask = amount;
+        //        }
+        //    }
+        //    else
+        //    {
+        //        // Если уровня нет, добавляем новый
+        //        levels.Add(new MarketDepthLevel
+        //        {
+        //            Price = price,
+        //            Bid = isBid ? amount : 0,
+        //            Ask = isBid ? 0 : amount
+        //        });
+        //    }
+        //}
+        //// Проверка и устранение ошибок с ценами
+        //private void ValidateDepthOrder(List<MarketDepthLevel> bids, List<MarketDepthLevel> asks)
+        //{
+        //    // Проверяем порядок для бидов (по убыванию)
+        //    for (int i = 1; i < bids.Count; i++)
+        //    {
+        //        if (bids[i].Price > bids[i - 1].Price)
+        //        {
+        //            SendLogMessage($"MD Error 18. Bids[i] price > Bids[i-1] price (Error at index {i})", LogMessageType.Error);
+        //            bids.RemoveAt(i); // Удаляем проблемный уровень
+        //            break; // Выход из цикла после удаления
+        //        }
+        //    }
+
+        //    // Проверяем порядок для асков (по возрастанию)
+        //    for (int i = 1; i < asks.Count; i++)
+        //    {
+        //        if (asks[i].Price < asks[i - 1].Price)
+        //        {
+        //            SendLogMessage($"MD Error 20. Asks[i] price < Asks[i-1] price (Error at index {i})", LogMessageType.Error);
+        //            asks.RemoveAt(i); // Удаляем проблемный уровень
+        //            break; // Выход из цикла после удаления
+        //        }
+        //    }
+        //}
+
+
+        //private void RemoveLevel(List<MarketDepthLevel> levels, decimal price)
+        //{
+        //    for (int i = 0; i < levels.Count; i++)
+        //    {
+        //        if (levels[i].Price == price)
+        //        {
+        //            levels.RemoveAt(i);
+        //            return;
+        //        }
+        //    }
+        //}
+
+
+        private Dictionary<int, MarketDepth> _allDepths = new Dictionary<int, MarketDepth>();
+        public void SnapshotDepth(string message, int currentChannelIdDepth)
         {
-            // Проверяем, что входное сообщение не пустое
             if (string.IsNullOrEmpty(message))
             {
                 SendLogMessage("Пустое сообщение в SnapshotDepth.", LogMessageType.Error);
                 return;
             }
 
-            // Десериализуем входное сообщение
             List<object> root;
             try
             {
@@ -1160,7 +1542,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return;
             }
 
-            // Проверяем, что десериализованные данные корректны
             if (root == null || root.Count < 2)
             {
                 SendLogMessage("Некорректное сообщение SnapshotDepth: недостаточно элементов.", LogMessageType.Error);
@@ -1171,26 +1552,13 @@ namespace OsEngine.Market.Servers.Bitfinex
             marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(channelId);
             string symbol = marketDepth.SecurityNameCode;
 
-
             if (currentChannelIdDepth != channelId)
             {
-                // Обновляем идентификатор текущего канала
                 currentChannelIdDepth = channelId;
-
-                // Обновляем название инструмента
                 marketDepth.SecurityNameCode = GetSymbolByKeyInDepth(currentChannelIdDepth);
-
-                // Очищаем данные стакана
-                //bidsSnapshot.Clear(); // Очищаем список бидов
-                //asksSnapshot.Clear(); // Очищаем список асков
-                //marketDepth.Bids.Clear(); // Очищаем глобальный стакан бидов
-                //marketDepth.Asks.Clear(); // Очищаем глобальный стакан асков
-
                 return;
             }
 
-
-            // Десериализуем данные снапшота
             List<List<object>> snapshot;
             try
             {
@@ -1202,31 +1570,25 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return;
             }
 
-            // Проверяем, что снапшот не пустой
             if (snapshot == null)
             {
                 SendLogMessage("Снапшот пустой.", LogMessageType.Error);
                 return;
             }
 
-            // Временные списки для обновления бидов и асков
             List<MarketDepthLevel> tempBids = new List<MarketDepthLevel>();
             List<MarketDepthLevel> tempAsks = new List<MarketDepthLevel>();
 
-            // Обрабатываем каждый уровень снапшота
             for (int i = 0; i < snapshot.Count; i++)
             {
                 var entry = snapshot[i];
 
-                // Проверяем, что в уровне достаточно данных
                 if (entry.Count < 3) continue;
 
-                // Парсим цену, количество и объём
                 decimal price = entry[0].ToString().ToDecimal();
                 decimal count = entry[1].ToString().ToDecimal();
                 decimal amount = entry[2].ToString().ToDecimal();
 
-                // Разделяем данные на биды и аски
                 if (amount > 0)
                 {
                     tempBids.Add(new MarketDepthLevel { Price = price, Bid = amount });
@@ -1236,30 +1598,18 @@ namespace OsEngine.Market.Servers.Bitfinex
                     tempAsks.Add(new MarketDepthLevel { Price = price, Ask = Math.Abs(amount) });
                 }
             }
-
-
-            if (!_allDepths.TryGetValue(channelId, out marketDepth))
+              ApplyDepthChanges(tempBids, tempAsks);
+            // Используем метод для добавления или обновления данных в словарь
+            AddOrUpdateSnapshot(channelId, new MarketDepth
             {
-                // Создаем новый объект, если он не существует
-                marketDepth = new MarketDepth
-                {
-                    SecurityNameCode = symbol,
-                    Bids = new List<MarketDepthLevel>(),
-                    Asks = new List<MarketDepthLevel>()
-                };
-                _allDepths.Add(channelId, marketDepth);
-                marketDepth.Time = DateTime.UtcNow;
-            }
+                SecurityNameCode = symbol,
+                Bids = tempBids,
+                Asks = tempAsks,
+                Time = DateTime.UtcNow
+            });
 
-            // Обновляем текущие данные снапшота
-            bidsSnapshot = tempBids;
-            asksSnapshot = tempAsks;
-
-
-
-            ApplyDepthChanges(bidsSnapshot, asksSnapshot);
-
-            // _allDepths[symbol] = marketDepth;
+            // Применяем изменения
+            
 
             marketDepth.Time = DateTime.UtcNow;
 
@@ -1276,11 +1626,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             _lastTimeMd = marketDepth.Time;
 
             MarketDepthEvent?.Invoke(marketDepth);
-
         }
-
-      
-
 
         public void UpdateDepth(string message, int currentChannelIdDepth)
         {
@@ -1289,7 +1635,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return;
             }
 
-            // Десериализуем входное сообщение
             List<object> root;
             try
             {
@@ -1307,34 +1652,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return;
             }
 
-            // Получаем идентификатор канала и символ
             int channelId = Convert.ToInt32(root[0]);
             string symbol = GetSymbolByKeyInDepth(channelId);
 
-            //// Если канал изменился, очищаем данные только для текущего символа
-            if (currentChannelIdDepth != channelId)
-            {
-                currentChannelIdDepth = channelId;
-
-                if (!_allDepths.TryGetValue(currentChannelIdDepth, out MarketDepth marketDepth))
-                {
-                    marketDepth = new MarketDepth
-                    {
-                        SecurityNameCode = symbol,
-                        Bids = new List<MarketDepthLevel>(),
-                        Asks = new List<MarketDepthLevel>()
-                    };
-                    _allDepths[channelId] = marketDepth;
-                }
-
-                marketDepth.Bids.Clear();
-                marketDepth.Asks.Clear();
-                marketDepth.Time = DateTime.UtcNow;
-
-                return;
-            }
-
-            // Получаем объект MarketDepth для текущего канала
+            // Получаем текущую глубину
             if (!_allDepths.TryGetValue(channelId, out MarketDepth currentMarketDepth))
             {
                 currentMarketDepth = new MarketDepth
@@ -1347,7 +1668,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 _allDepths[channelId] = currentMarketDepth;
             }
 
-            // Десериализуем данные обновления
             List<object> bookEntry;
             try
             {
@@ -1365,12 +1685,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return;
             }
 
-            // Парсим данные обновления
             decimal price = bookEntry[0].ToString().ToDecimal();
             decimal count = bookEntry[1].ToString().ToDecimal();
             decimal amount = bookEntry[2].ToString().ToDecimal();
 
-            // Обрабатываем обновление
             if (count > 0)
             {
                 if (amount > 0)
@@ -1388,15 +1706,18 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     RemoveLevel(currentMarketDepth.Bids, price); // Удаляем из Bids
                 }
-                else if (amount <0)
+                else if (amount < 0)
                 {
                     RemoveLevel(currentMarketDepth.Asks, price); // Удаляем из Asks
                 }
             }
 
-            // Применяем изменения и обновляем время
-            ApplyDepthChanges(currentMarketDepth.Bids, currentMarketDepth.Asks);
-            // currentMarketDepth.Time = DateTime.UtcNow;
+  ApplyDepthChanges(currentMarketDepth.Bids, currentMarketDepth.Asks);
+            // Обновляем данные в словаре
+            AddOrUpdateSnapshot(channelId, currentMarketDepth);
+
+            // Применяем изменения
+          
 
             marketDepth.Time = DateTime.UtcNow;
 
@@ -1414,8 +1735,25 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             // Вызываем событие
             MarketDepthEvent?.Invoke(currentMarketDepth);
-            
         }
+
+
+
+        public void AddOrUpdateSnapshot(int snapshotId, MarketDepth marketDepth)
+        {
+            // Проверяем, существует ли уже такой снапшот в словаре
+            if (_allDepths.ContainsKey(snapshotId))
+            {
+                // Если существует, перезаписываем значение
+                _allDepths[snapshotId] = marketDepth;
+            }
+            else
+            {
+                // Если не существует, добавляем новый
+                _allDepths.Add(snapshotId, marketDepth);
+            }
+        }
+
         private void ApplyDepthChanges(List<MarketDepthLevel> bids, List<MarketDepthLevel> asks)
         {
             // Сортируем биды по убыванию цены
@@ -1440,7 +1778,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             ValidateDepthOrder(bids, asks);
         }
 
-     
+
         private void UpdateLevel(List<MarketDepthLevel> levels, decimal price, decimal amount, bool isBid)
         {
             // Проверяем, если уровень с такой ценой уже существует
@@ -1494,7 +1832,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        
+
         private void RemoveLevel(List<MarketDepthLevel> levels, decimal price)
         {
             for (int i = 0; i < levels.Count; i++)
@@ -1506,6 +1844,17 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
             }
         }
+
+
+
+
+
+
+
+
+
+
+
 
 
         private void WebSocketPrivate_Opened(object sender, EventArgs e)
