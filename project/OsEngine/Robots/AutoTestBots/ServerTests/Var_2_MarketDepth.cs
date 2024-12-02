@@ -183,12 +183,12 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
                 }
                 if (md.Bids[i].Ask != 0)
                 {
-                    SetNewError("MD Error 7. Ask in bids array is note zero");
+                    SetNewError($"MD Error 7. Ask in bids array is note zero{md.SecurityNameCode}) ({md.Bids[i].Ask})");
                     return;
                 }
                 if (md.Bids[i].Bid == 0)
                 {
-                    SetNewError("MD Error 8. Bid in bids array is zero");
+                    SetNewError($"MD Error 8. Bid in bids array is zero{md.SecurityNameCode} {md.Bids[i].Bid} ");
                     return;
                 }
             }
@@ -307,7 +307,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
                 if (md.Asks[i].Price < md.Asks[i - 1].Price)
                 {
-                    SetNewError($"MD Error 20. Asks[i] price < Asks[i-1] price({md.Asks[i].Price}-{md.Asks[i - 1].Price})");
+                    SetNewError($"MD Error 20. Asks[i] price < Asks[i-1] price({md.SecurityNameCode}) ({md.Asks[i].Price}-{md.Asks[i - 1].Price})");
                 }
             }
 
