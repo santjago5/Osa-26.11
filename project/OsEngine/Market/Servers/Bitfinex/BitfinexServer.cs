@@ -1888,7 +1888,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         private List<MarketDepthLevel> asksSnapshot = new List<MarketDepthLevel>();
          
         // Метод для обработки снапшота глубины рынка
-        public void SnapshotDepth(string message, int currentChannelIdDepth)
+        public void SnapshotDepth(string message, int currentChannelIdDepth)//(AddSnapshotToDictionary)
        {
             // Проверяем, что входное сообщение не пустое
             if (string.IsNullOrEmpty(message))
@@ -1929,17 +1929,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             //    newMarketDepth.SecurityNameCode = symbol;
             //    newMarketDepth.Add(newMarketDepth);
             //}
-
-            MarketDepth existingMarketDepth;
-            if (!_allDepths.TryGetValue(symbol, out existingMarketDepth))
-            {
-                // Если запись не существует, создаём новую и добавляем её в словарь
-                existingMarketDepth = new MarketDepth
-                {
-                    SecurityNameCode = symbol
-                };
-                _allDepths.Add(symbol, existingMarketDepth);
-            }
 
            
             if (currentChannelIdDepth != channelId)
@@ -2007,10 +1996,34 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
             }
 
+            //MarketDepth existingMarketDepth;
+            //if (!_allDepths.TryGetValue(symbol, out existingMarketDepth))
+            //{
+            //    // Если запись не существует, создаём новую и добавляем её в словарь
+            //    existingMarketDepth = new MarketDepth
+            //    {
+            //        SecurityNameCode = symbol
+            //    };
+            //    _allDepths.Add(symbol, existingMarketDepth);
+            //}
+            if (!_allDepths.TryGetValue(symbol, out marketDepth))
+            {
+                // Создаем новый объект, если он не существует
+                marketDepth = new MarketDepth
+                {
+                    SecurityNameCode = symbol,
+                    Bids = new List<MarketDepthLevel>(),
+                    Asks = new List<MarketDepthLevel>()
+                };
+                _allDepths.Add(symbol, marketDepth);
+            }
+
             // Обновляем текущие данные снапшота
             bidsSnapshot = tempBids;
             asksSnapshot = tempAsks;
          
+
+
             ApplyDepthChanges(bidsSnapshot, asksSnapshot);
 
             _allDepths[symbol] = marketDepth;
@@ -2714,7 +2727,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                         // Проверяем, совпадает ли channelId с channelIdDepth
                         if (channelId == currentChannelIdDepth)
-                        {
+                        { 
                             SnapshotDepth(message, channelId); // Вызов метода обработки снапшота стакана
                         }
 
