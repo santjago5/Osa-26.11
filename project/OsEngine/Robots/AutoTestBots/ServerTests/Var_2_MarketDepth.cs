@@ -157,7 +157,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
             if (md.Bids.Count == 0 ||
                 md.Asks.Count == 0)
             {
-                SetNewError("MD Error 3. Zero count in bids or asks array");
+                SetNewError($"MD Error 3. Zero count in bids or asks array {md.Bids.Count} {md.SecurityNameCode}");
                 return;
             }
 
