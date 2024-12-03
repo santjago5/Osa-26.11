@@ -1712,8 +1712,36 @@ namespace OsEngine.Market.Servers.Bitfinex
                     }
 
                 }
+
             }
 
+
+            if (currentMarketDepth.Asks.Count < 2 ||
+                        currentMarketDepth.Bids.Count < 2)
+            {
+                return;
+            }
+
+            if (currentMarketDepth.Asks[0].Price > currentMarketDepth.Asks[1].Price)
+            {
+                currentMarketDepth.Asks.RemoveAt(0);
+            }
+            if (currentMarketDepth.Bids[0].Price < currentMarketDepth.Bids[1].Price)
+            {
+                currentMarketDepth.Asks.RemoveAt(0);
+            }
+
+            if (currentMarketDepth.Asks[0].Price < currentMarketDepth.Bids[0].Price)
+            {
+                if (currentMarketDepth.Asks[0].Price < currentMarketDepth.Bids[1].Price)
+                {
+                    currentMarketDepth.Asks.Remove(currentMarketDepth.Asks[0]);
+                }
+                else if (currentMarketDepth.Bids[0].Price > currentMarketDepth.Asks[1].Price)
+                {
+                    currentMarketDepth.Bids.Remove(currentMarketDepth.Bids[0]);
+                }
+            }
             //Ограничиваем количество уровней
             const int MaxLevels = 25;
             if (currentMarketDepth.Bids.Count > MaxLevels) currentMarketDepth.Bids.RemoveRange(MaxLevels, currentMarketDepth.Bids.Count - MaxLevels);
@@ -1721,7 +1749,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             //currentMarketDepth.Bids.Sort((a, b) => b.Price.CompareTo(a.Price)); // Сортируем биды по убыванию
             //currentMarketDepth.Asks.Sort((a, b) => a.Price.CompareTo(b.Price)); // Сортируем аски по возрастанию
-
+          //  currentMarketDepth.Asks.Sort((level, depthLevel) => level.Price.CompareTo(depthLevel.Price));
 
             //// Сохраняем обновленные списки в словаре
             //currentMarketDepth.Bids = tempBids;
