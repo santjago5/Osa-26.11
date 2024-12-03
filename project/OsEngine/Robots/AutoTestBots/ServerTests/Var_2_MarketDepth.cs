@@ -291,7 +291,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
                 if (md.Bids[i].Price > md.Bids[i - 1].Price)
                 {
-                    SetNewError("MD Error 18. Bibs[i] price > Bibs[i-1] price");
+                    SetNewError($"MD Error 18. Bibs[i] price > Bibs[i-1] price({md.SecurityNameCode}) ({md.Asks[i].Price}-{md.Asks[i - 1].Price})");
                 }
             }
 
