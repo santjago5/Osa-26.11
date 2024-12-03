@@ -1668,14 +1668,16 @@ namespace OsEngine.Market.Servers.Bitfinex
                 if (amount > 0)
                 {
                     AddOrUpdateLevel(currentMarketDepth.Bids, price, amount, isBid: true);
+
                 }
                 else if (amount < 0)
                 {
                     AddOrUpdateLevel(currentMarketDepth.Asks, price, Math.Abs(amount), isBid: false);
+ 
+
                 }
                 currentMarketDepth.Bids.Sort((a, b) => b.Price.CompareTo(a.Price)); // Сортируем биды по убыванию
-                currentMarketDepth.Asks.Sort((a, b) => a.Price.CompareTo(b.Price)); // Сортируем аски по возрастанию
-
+               currentMarketDepth.Asks.Sort((a, b) => a.Price.CompareTo(b.Price)); // Сортируем аски по возрастанию
             }
 
 
@@ -1717,8 +1719,8 @@ namespace OsEngine.Market.Servers.Bitfinex
             if (currentMarketDepth.Bids.Count > MaxLevels) currentMarketDepth.Bids.RemoveRange(MaxLevels, currentMarketDepth.Bids.Count - MaxLevels);
             if (currentMarketDepth.Asks.Count > MaxLevels) currentMarketDepth.Asks.RemoveRange(MaxLevels, currentMarketDepth.Asks.Count - MaxLevels);
 
-            currentMarketDepth.Bids.Sort((a, b) => b.Price.CompareTo(a.Price)); // Сортируем биды по убыванию
-            currentMarketDepth.Asks.Sort((a, b) => a.Price.CompareTo(b.Price)); // Сортируем аски по возрастанию
+            //currentMarketDepth.Bids.Sort((a, b) => b.Price.CompareTo(a.Price)); // Сортируем биды по убыванию
+            //currentMarketDepth.Asks.Sort((a, b) => a.Price.CompareTo(b.Price)); // Сортируем аски по возрастанию
 
 
             //// Сохраняем обновленные списки в словаре
@@ -1764,30 +1766,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
 
 
-        //needDepth.Asks.Remove(needDepth.Asks.Find(level => level.Price == price));
-        //private void RemoveLevel(List<MarketDepthLevel> levels, decimal price)
-        //{
-        //    for (int i = 0; i < levels.Count; i++)
-        //    {
-        //        // 5.1.10.	С одинаковой ценой не может быть несколько уровней
-
-        //        MarketDepthLevel curLevel = MarketDepth.tempBids[i];
-
-        //        for (int j = 0; j < md.Bids.Count; j++)
-        //        {
-        //            if (j == i)
-        //            {
-        //                continue;
-        //            }
-
-        //            if (curLevel.Price == MarketDepth.Bids[j].Price)
-        //            {
-        //                SetNewError($"MD Error 21. Bids with same price({md.SecurityNameCode})-({curLevel.Price})-({md.Bids[j].Price})");//с маленькой буквы
-
-        //            }
-        //        }
-        //    }
-        //}
         // Метод удаления уровня цены
         //private void RemoveLevel(List<MarketDepthLevel> levels, decimal price)
         //{
