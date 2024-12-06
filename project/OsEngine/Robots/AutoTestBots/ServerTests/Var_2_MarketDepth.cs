@@ -275,7 +275,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
             if (md.Bids[0].Price >= md.Asks[0].Price)
             {
-                SetNewError("MD Error 16. Bib price >= Ask price");
+                SetNewError($"MD Error 16. Bib price >= Ask price  {md.SecurityNameCode}   ({md.Bids[0].Price})({md.Asks[0].Price})");
                 return;
             }
 
