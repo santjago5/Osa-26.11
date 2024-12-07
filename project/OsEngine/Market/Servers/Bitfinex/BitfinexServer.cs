@@ -1354,10 +1354,22 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                     needDepth.Asks = ascs;
                     needDepth.Bids = bids;
-                    needDepth.Time =DateTime.UtcNow;
+                needDepth.Time = ServerTime;
+
+                if (needDepth.Time < _lastTimeMd)
+                {
+                    needDepth.Time = _lastTimeMd;
+                }
+                else if (needDepth.Time == _lastTimeMd)
+                {
+                    _lastTimeMd = DateTime.FromBinary(_lastTimeMd.Ticks + 1);
+                    needDepth.Time = _lastTimeMd;
+                }
+
+                _lastTimeMd = needDepth.Time;
 
 
-                    if (MarketDepthEvent != null)
+                if (MarketDepthEvent != null)
                     {
                         MarketDepthEvent(needDepth.GetCopy());
                     }
@@ -1404,10 +1416,24 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                     var amount = Convert.ToDecimal(newData[2]);
 
-                    needDepth.Time = DateTime.UtcNow;
 
-                    // если колл-во ореров равно 0, значит надо найти уровень этой цены и удалить его
-                    if (count == 0)
+                needDepth.Time = ServerTime;
+
+                if (needDepth.Time < _lastTimeMd)
+                {
+                    needDepth.Time = _lastTimeMd;
+                }
+                else if (needDepth.Time == _lastTimeMd)
+                {
+                    _lastTimeMd = DateTime.FromBinary(_lastTimeMd.Ticks + 1);
+                    needDepth.Time = _lastTimeMd;
+                }
+
+                _lastTimeMd = needDepth.Time;
+
+
+                // если колл-во ореров равно 0, значит надо найти уровень этой цены и удалить его
+                if (count == 0)
                     {
                        
                         if (amount < 0)  // delete from asks / удаляем из асков
