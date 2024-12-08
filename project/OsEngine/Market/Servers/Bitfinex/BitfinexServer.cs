@@ -1133,310 +1133,83 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         private DateTime _lastTimeMd = DateTime.MinValue;
 
-        //private List<MarketDepth> _marketDepths = new List<MarketDepth>();
-
-        //private void SnapshotDepth(string message)
-        //{
-        //    List<object> root = JsonConvert.DeserializeObject<List<object>>(message);
-
-        //    if (root == null || root.Count < 2)
-        //    {
-
-        //        return;
-        //    }
-
-        //    int channelId = Convert.ToInt32(root[0]);
-
-        //    string securityName = GetSymbolByKeyInDepth(channelId);
-
-        //    List<List<object>> snapshot = JsonConvert.DeserializeObject<List<List<object>>>(root[1].ToString());
-
-        //    if (snapshot == null)
-        //    {
-        //        return;
-        //    }
-
-        //    try
-        //    {
-        //        if (_marketDepths == null)
-        //        {
-        //            _marketDepths = new List<MarketDepth>();
-        //        }
-
-        //        var needDepth = _marketDepths.Find(depth =>
-        //            depth.SecurityNameCode == securityName);
-
-        //        if (needDepth == null)
-        //        {
-        //            needDepth = new MarketDepth();
-        //            needDepth.SecurityNameCode = securityName;
-        //            _marketDepths.Add(needDepth);
-        //        }
-
-        //        List<MarketDepthLevel> asks = new List<MarketDepthLevel>();
-        //        List<MarketDepthLevel> bids = new List<MarketDepthLevel>();
-
-        //        // Цикл для перебора элементов snapshot
-        //        for (int i = 0; i < snapshot.Count; i++)
-        //        {
-        //            List<object> value = snapshot[i];
-
-        //            if (Convert.ToDecimal(value[2]) > 0)
-        //            {
-        //                bids.Add(new MarketDepthLevel()
-        //                {
-        //                    Bid = Convert.ToDecimal(value[2]),
-        //                    Price = Convert.ToDecimal(value[0]),
-        //                });
-        //            }
-        //            else
-        //            {
-        //                asks.Add(new MarketDepthLevel()
-        //                {
-        //                    Ask = Convert.ToDecimal(Math.Abs(Convert.ToDecimal(value[2]))),
-        //                    Price = Convert.ToDecimal(value[0]),
-        //                });
-        //            }
-        //        }
-
-        //        needDepth.Asks = asks;
-        //        needDepth.Bids = bids;
-
-        //        needDepth.Time = ServerTime;
-
-        //        if (needDepth.Time < _lastTimeMd)
-        //        {
-        //            needDepth.Time = _lastTimeMd;
-        //        }
-        //        else if (needDepth.Time == _lastTimeMd)
-        //        {
-        //            _lastTimeMd = DateTime.FromBinary(_lastTimeMd.Ticks + 1);
-        //            needDepth.Time = _lastTimeMd;
-        //        }
-
-        //        _lastTimeMd = needDepth.Time;
-
-        //        if (MarketDepthEvent != null)
-        //        {
-        //            MarketDepthEvent(needDepth.GetCopy());
-        //        }
-
-        //    }
-        //    catch (Exception error)
-        //    {
-        //        SendLogMessage(error.ToString(), LogMessageType.Error);
-        //    }
-        //}
-
-        //private void UpdateDepth(string message)
-        //{
-        //    List<object> root = JsonConvert.DeserializeObject<List<object>>(message);
-
-        //    List<object> update = JsonConvert.DeserializeObject<List<object>>(root[1].ToString());
-
-        //    int channelId = Convert.ToInt32(root[0]);
-
-        //    string securityName = GetSymbolByKeyInDepth(channelId);
-
-        //    try
-        //    {
-        //        if (_marketDepths == null)
-        //        {
-        //            return;
-        //        }
-        //        var needDepth = _marketDepths.Find(depth =>
-        //            depth.SecurityNameCode == securityName);
-
-        //        if (needDepth == null)
-        //        {
-        //            return;
-        //        }
-
-        //        var price = (update[0]).ToString().ToDecimal();
-
-        //        var count = (update[1]).ToString().ToDecimal();
-
-        //        var amount = (update[2]).ToString().ToDecimal();
-
-
-        //        needDepth.Time = ServerTime;
-
-        //        if (needDepth.Time < _lastTimeMd)
-        //        {
-        //            needDepth.Time = _lastTimeMd;
-        //        }
-        //        else if (needDepth.Time == _lastTimeMd)
-        //        {
-        //            _lastTimeMd = DateTime.FromBinary(_lastTimeMd.Ticks + 1);
-
-        //            needDepth.Time = _lastTimeMd;
-        //        }
-
-        //        _lastTimeMd = needDepth.Time;
-
-
-        //        if (count == 0)
-        //        {
-        //            if (amount < 0)
-        //            {
-        //                needDepth.Asks.Remove(needDepth.Asks.Find(level => level.Price == price));
-        //            }
-
-        //            if (amount > 0)
-        //            {
-        //                needDepth.Bids.Remove(needDepth.Bids.Find(level => level.Price == price));
-        //            }
-        //            return;
-        //        }
-
-        //        else if (amount > 0)
-        //        {
-        //            var needLevel = needDepth.Bids.Find(bid => bid.Price == price);
-
-        //            if (needLevel == null)
-        //            {
-        //                needDepth.Bids.Add(new MarketDepthLevel()
-        //                {
-        //                    Bid = amount,
-        //                    Price = price
-        //                });
-
-        //                needDepth.Bids.Sort((level, depthLevel) => level.Price > depthLevel.Price ? -1 : level.Price < depthLevel.Price ? 1 : 0);
-        //            }
-        //            else
-        //            {
-        //                needLevel.Bid = amount;
-        //            }
-
-        //        }
-
-        //        else if (amount < 0)
-        //        {
-        //            var needLevel = needDepth.Asks.Find(asc => asc.Price == price);
-
-        //            if (needLevel == null)
-        //            {
-        //                needDepth.Asks.Add(new MarketDepthLevel()
-        //                {
-        //                    Ask = Math.Abs(amount),
-        //                    Price = price
-        //                });
-
-        //                needDepth.Asks.Sort((level, depthLevel) => level.Price > depthLevel.Price ? 1 : level.Price < depthLevel.Price ? -1 : 0);
-        //            }
-        //            else
-        //            {
-        //                needLevel.Ask = Math.Abs(amount);
-        //            }
-
-        //        }
-
-        //        if (needDepth.Asks.Count < 2 ||
-        //            needDepth.Bids.Count < 2)
-        //        {
-        //            return;
-        //        }
-
-        //        if (needDepth.Asks[0].Price > needDepth.Asks[1].Price)
-        //        {
-        //            needDepth.Asks.RemoveAt(0);
-        //        }
-        //        if (needDepth.Bids[0].Price < needDepth.Bids[1].Price)
-        //        {
-        //            needDepth.Asks.RemoveAt(0);
-        //        }
-
-        //        if (needDepth.Asks[0].Price < needDepth.Bids[0].Price)
-        //        {
-        //            if (needDepth.Asks[0].Price < needDepth.Bids[1].Price)
-        //            {
-        //                needDepth.Asks.Remove(needDepth.Asks[0]);
-        //            }
-        //            else if (needDepth.Bids[0].Price > needDepth.Asks[1].Price)
-        //            {
-        //                needDepth.Bids.Remove(needDepth.Bids[0]);
-        //            }
-        //        }
-
-        //        if (MarketDepthEvent != null)
-        //        {
-        //            MarketDepthEvent(needDepth.GetCopy());
-        //        }
-
-        //    }
-        //    catch (Exception error)
-        //    {
-        //        SendLogMessage(error.ToString(), LogMessageType.Error);
-        //    }
-        //}
-
-
-        private Dictionary<int, MarketDepth> _marketDepths = new Dictionary<int, MarketDepth>();
+        private List<MarketDepth> _marketDepths = new List<MarketDepth>();
 
         private void SnapshotDepth(string message)
         {
-            List<object> root = JsonConvert.DeserializeObject<List<object>>(message);
-
-            if (root == null || root.Count < 2)
-            {
-                return;
-            }
-
-            int channelId = Convert.ToInt32(root[0]);
-            string securityName = GetSymbolByKeyInDepth(channelId);
-
-            List<List<object>> snapshot = JsonConvert.DeserializeObject<List<List<object>>>(root[1].ToString());
-
-            if (snapshot == null)
-            {
-                return;
-            }
-
             try
             {
-                if (!_marketDepths.ContainsKey(channelId))
+                if (string.IsNullOrEmpty(message))
                 {
-                    _marketDepths[channelId] = new MarketDepth
-                    {
-                        SecurityNameCode = securityName
-                    };
+                    SendLogMessage("Received empty message", LogMessageType.Error);
+                    return;
+                }
+                List<object> root = JsonConvert.DeserializeObject<List<object>>(message);
+
+                if (root == null || root.Count < 2)
+                {
+                    SendLogMessage("Invalid root structure", LogMessageType.Error);
+                    return;
                 }
 
-                MarketDepth needDepth = _marketDepths[channelId];
+                int channelId = Convert.ToInt32(root[0]);
+
+                string securityName = GetSymbolByKeyInDepth(channelId);
+
+                List<List<object>> snapshot = JsonConvert.DeserializeObject<List<List<object>>>(root[1].ToString());
+
+                if (snapshot == null || snapshot.Count == 0)
+                {
+                    SendLogMessage("Snapshot data is empty", LogMessageType.Error);
+                    return;
+                }
+
+                if (_marketDepths == null)
+                {
+                    _marketDepths = new List<MarketDepth>();
+                }
+
+                var needDepth = _marketDepths.Find(depth =>
+                    depth.SecurityNameCode == securityName);
+
+                if (needDepth == null)
+                {
+                    needDepth = new MarketDepth();
+                    needDepth.SecurityNameCode = securityName;
+                    _marketDepths.Add(needDepth);
+                }
 
                 List<MarketDepthLevel> asks = new List<MarketDepthLevel>();
                 List<MarketDepthLevel> bids = new List<MarketDepthLevel>();
 
-                // Loop through snapshot
+
                 for (int i = 0; i < snapshot.Count; i++)
                 {
                     List<object> value = snapshot[i];
-                    decimal price = Convert.ToDecimal(value[0]);
-                    decimal amount = Convert.ToDecimal(value[2]);
 
-                    if (amount > 0)
+                    if (Convert.ToDecimal(value[2]) > 0)
                     {
-                        bids.Add(new MarketDepthLevel
+                        bids.Add(new MarketDepthLevel()
                         {
-                            Bid = amount,
-                            Price = price
+                            Bid = Convert.ToDecimal(value[2]),
+                            Price = Convert.ToDecimal(value[0]),
                         });
                     }
                     else
                     {
-                        asks.Add(new MarketDepthLevel
+                        asks.Add(new MarketDepthLevel()
                         {
-                            Ask = Math.Abs(amount),
-                            Price = price
+                            Ask = Convert.ToDecimal(Math.Abs(Convert.ToDecimal(value[2]))),
+                            Price = Convert.ToDecimal(value[0]),
                         });
                     }
                 }
 
                 needDepth.Asks = asks;
                 needDepth.Bids = bids;
+
                 needDepth.Time = ServerTime;
 
-                // Adjust time if necessary
                 if (needDepth.Time < _lastTimeMd)
                 {
                     needDepth.Time = _lastTimeMd;
@@ -1449,7 +1222,11 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 _lastTimeMd = needDepth.Time;
 
-                MarketDepthEvent?.Invoke(needDepth.GetCopy());
+                if (MarketDepthEvent != null)
+                {
+                    MarketDepthEvent(needDepth.GetCopy());
+                }
+
             }
             catch (Exception error)
             {
@@ -1459,28 +1236,55 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         private void UpdateDepth(string message)
         {
-            List<object> root = JsonConvert.DeserializeObject<List<object>>(message);
-            List<object> update = JsonConvert.DeserializeObject<List<object>>(root[1].ToString());
-
-            int channelId = Convert.ToInt32(root[0]);
-            string securityName = GetSymbolByKeyInDepth(channelId);
-
             try
             {
-                if (!_marketDepths.ContainsKey(channelId))
+                if (string.IsNullOrEmpty(message))
+                {
+                    SendLogMessage("Received empty message", LogMessageType.Error);
+                    return;
+                }
+                List<object> root = JsonConvert.DeserializeObject<List<object>>(message);
+
+                if (root == null || root.Count < 2)
+                {
+                    SendLogMessage("Invalid root structure", LogMessageType.Error);
+                    return;
+                }
+
+                List<object> update = JsonConvert.DeserializeObject<List<object>>(root[1].ToString());
+
+                if (update == null || update.Count < 3)
+                {
+                    SendLogMessage("Invalid update data", LogMessageType.Error);
+                    return;
+                }
+
+                int channelId = Convert.ToInt32(root[0]);
+
+                string securityName = GetSymbolByKeyInDepth(channelId);
+
+
+                if (_marketDepths == null)
+                {
+                    return;
+                }
+                var needDepth = _marketDepths.Find(depth =>
+                    depth.SecurityNameCode == securityName);
+
+                if (needDepth == null)
                 {
                     return;
                 }
 
-                MarketDepth needDepth = _marketDepths[channelId];
+                var price = (update[0]).ToString().ToDecimal();
 
-                decimal price = (update[0]).ToString().ToDecimal();
-                decimal count = (update[1]).ToString().ToDecimal();
-                decimal amount = (update[2]).ToString().ToDecimal();
+                var count = (update[1]).ToString().ToDecimal();
+
+                var amount = (update[2]).ToString().ToDecimal();
+
 
                 needDepth.Time = ServerTime;
 
-                // Adjust time if necessary
                 if (needDepth.Time < _lastTimeMd)
                 {
                     needDepth.Time = _lastTimeMd;
@@ -1488,139 +1292,107 @@ namespace OsEngine.Market.Servers.Bitfinex
                 else if (needDepth.Time == _lastTimeMd)
                 {
                     _lastTimeMd = DateTime.FromBinary(_lastTimeMd.Ticks + 1);
+
                     needDepth.Time = _lastTimeMd;
                 }
 
                 _lastTimeMd = needDepth.Time;
 
+
                 if (count == 0)
                 {
                     if (amount < 0)
                     {
-                        // Remove from Asks
-                        for (int i = 0; i < needDepth.Asks.Count; i++)
-                        {
-                            if (needDepth.Asks[i].Price == price)
-                            {
-                                needDepth.Asks.RemoveAt(i);
-                                break;
-                            }
-                        }
+                        needDepth.Asks.Remove(needDepth.Asks.Find(level => level.Price == price));
                     }
 
                     if (amount > 0)
                     {
-                        // Remove from Bids
-                        for (int i = 0; i < needDepth.Bids.Count; i++)
-                        {
-                            if (needDepth.Bids[i].Price == price)
-                            {
-                                needDepth.Bids.RemoveAt(i);
-                                break;
-                            }
-                        }
+                        needDepth.Bids.Remove(needDepth.Bids.Find(level => level.Price == price));
                     }
-
                     return;
                 }
 
-                if (amount > 0)
+                else if (amount > 0)
                 {
-                    bool found = false;
+                    var needLevel = needDepth.Bids.Find(bid => bid.Price == price);
 
-                    // Update or Add to Bids
-                    for (int i = 0; i < needDepth.Bids.Count; i++)
+                    if (needLevel == null)
                     {
-                        if (needDepth.Bids[i].Price == price)
-                        {
-                            needDepth.Bids[i].Bid = amount;
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if (!found)
-                    {
-                        needDepth.Bids.Add(new MarketDepthLevel
+                        needDepth.Bids.Add(new MarketDepthLevel()
                         {
                             Bid = amount,
                             Price = price
                         });
 
-                        // Sort Bids by Price (Descending)
-                        needDepth.Bids.Sort((level, depthLevel) => depthLevel.Price.CompareTo(level.Price));
+                        needDepth.Bids.Sort((level, depthLevel) => level.Price > depthLevel.Price ? -1 : level.Price < depthLevel.Price ? 1 : 0);
                     }
+                    else
+                    {
+                        needLevel.Bid = amount;
+                    }
+
                 }
+
                 else if (amount < 0)
                 {
-                    bool found = false;
+                    var needLevel = needDepth.Asks.Find(ask => ask.Price == price);
 
-                    // Update or Add to Asks
-                    for (int i = 0; i < needDepth.Asks.Count; i++)
+                    if (needLevel == null)
                     {
-                        if (needDepth.Asks[i].Price == price)
-                        {
-                            needDepth.Asks[i].Ask = Math.Abs(amount);
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if (!found)
-                    {
-                        needDepth.Asks.Add(new MarketDepthLevel
+                        needDepth.Asks.Add(new MarketDepthLevel()
                         {
                             Ask = Math.Abs(amount),
                             Price = price
                         });
 
-                        // Sort Asks by Price (Ascending)
-                        needDepth.Asks.Sort((level, depthLevel) => level.Price.CompareTo(depthLevel.Price));
+                        needDepth.Asks.Sort((level, depthLevel) => level.Price > depthLevel.Price ? 1 : level.Price < depthLevel.Price ? -1 : 0);
                     }
+                    else
+                    {
+                        needLevel.Ask = Math.Abs(amount);
+                    }
+
                 }
 
-                // Clean up Bids and Asks if there are less than 2 levels
-                if (needDepth.Asks.Count < 2 || needDepth.Bids.Count < 2)
+                if (needDepth.Asks.Count < 2 ||
+                    needDepth.Bids.Count < 2)
                 {
                     return;
                 }
 
-                // Remove highest Ask if it is greater than the second highest Ask
                 if (needDepth.Asks[0].Price > needDepth.Asks[1].Price)
                 {
                     needDepth.Asks.RemoveAt(0);
                 }
-
-                // Remove lowest Bid if it is less than the second lowest Bid
                 if (needDepth.Bids[0].Price < needDepth.Bids[1].Price)
                 {
-                    needDepth.Bids.RemoveAt(0);
+                    needDepth.Asks.RemoveAt(0);
                 }
 
-                // Ensure there is no cross between the highest Bid and lowest Ask
                 if (needDepth.Asks[0].Price < needDepth.Bids[0].Price)
                 {
                     if (needDepth.Asks[0].Price < needDepth.Bids[1].Price)
                     {
-                        needDepth.Asks.RemoveAt(0);
+                        needDepth.Asks.Remove(needDepth.Asks[0]);
                     }
                     else if (needDepth.Bids[0].Price > needDepth.Asks[1].Price)
                     {
-                        needDepth.Bids.RemoveAt(0);
+                        needDepth.Bids.Remove(needDepth.Bids[0]);
                     }
                 }
 
-                MarketDepthEvent?.Invoke(needDepth.GetCopy());
+                if (MarketDepthEvent != null)
+                {
+                    MarketDepthEvent(needDepth.GetCopy());
+                }
+
             }
             catch (Exception error)
             {
                 SendLogMessage(error.ToString(), LogMessageType.Error);
             }
         }
-
-
-
-
 
 
         private void WebSocketPrivate_Opened(object sender, EventArgs e)
@@ -1936,7 +1708,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         private readonly object _newTradesLoker = new object();
 
-      
+
 
 
 
@@ -1951,34 +1723,34 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 var root = JsonConvert.DeserializeObject<List<object>>(message);
 
-                    if (root == null && root.Count < 2)
-                    {
-                        return;
-                    }
-
-                    var tradeData = JsonConvert.DeserializeObject<List<object>>(root[2].ToString());
-
-                    int channelId = Convert.ToInt32(root[0]);
-
-                    if (tradeData == null && tradeData.Count < 4)
-                    {
-                        return;
-                    }
-
-                    Trade newTrade = new Trade();
-
-                    newTrade.SecurityNameCode = GetSymbolByKeyInTrades(channelId);
-                    newTrade.Id = tradeData[0].ToString();  
-                    decimal tradeAmount = tradeData[2].ToString().ToDecimal();
-                    newTrade.Price = tradeData[3].ToString().ToDecimal();  
-                    newTrade.Volume = Math.Abs(tradeAmount); 
-                    newTrade.Side = tradeAmount > 0 ? Side.Buy : Side.Sell;
-                    newTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(tradeData[1]));
-
-                    //ServerTime = newTrade.Time;
-                    NewTradesEvent?.Invoke(newTrade);
+                if (root == null && root.Count < 2)
+                {
+                    return;
                 }
-            
+
+                var tradeData = JsonConvert.DeserializeObject<List<object>>(root[2].ToString());
+
+                int channelId = Convert.ToInt32(root[0]);
+
+                if (tradeData == null && tradeData.Count < 4)
+                {
+                    return;
+                }
+
+                Trade newTrade = new Trade();
+
+                newTrade.SecurityNameCode = GetSymbolByKeyInTrades(channelId);
+                newTrade.Id = tradeData[0].ToString();
+                decimal tradeAmount = tradeData[2].ToString().ToDecimal();
+                newTrade.Price = tradeData[3].ToString().ToDecimal();
+                newTrade.Volume = Math.Abs(tradeAmount);
+                newTrade.Side = tradeAmount > 0 ? Side.Buy : Side.Sell;
+                newTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(tradeData[1]));
+
+                //ServerTime = newTrade.Time;
+                NewTradesEvent?.Invoke(newTrade);
+            }
+
             catch (Exception exception)
             {
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
