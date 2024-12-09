@@ -347,7 +347,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
                 if (candleLast.TimeStart > candleNow.TimeStart)
                 {
-                    SetNewError("Error 9. The time in the old candle is big than in the current candle " + timeFrame.ToString() + "Security: " + sec);
+                    SetNewError("Error 9. The time in the old candle is big than in the current candle " + timeFrame.ToString() + "Security: " + sec + candleLast.TimeStart + candleNow.TimeStart);
                     return false;
                 }
 
