@@ -8,6 +8,7 @@ using OsEngine.Language;
 using OsEngine.Logging;
 using OsEngine.Market.Servers.Bitfinex.Json;
 using OsEngine.Market.Servers.Entity;
+using OsEngine.Market.Servers.Transaq.TransaqEntity;
 using RestSharp;
 using System;
 using System.Collections.Concurrent;
@@ -584,18 +585,18 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             return null;
         }
+
         public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
         {
             int tfTotalMinutes = (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes;
             DateTime endTime = DateTime.Now;
             DateTime startTime = endTime.AddMinutes(-tfTotalMinutes * candleCount);
 
-            return GetCandleDataToSecurity(security, timeFrameBuilder, startTime, endTime, endTime);
+            return GetCandleDataToSecurity(security, timeFrameBuilder, startTime, endTime, startTime);
 
         }
 
        private int _limit = 10000;
-    
 
         public List<Candle> GetCandleDataToSecurity(Security security, TimeFrameBuilder timeFrameBuilder, DateTime startTime, DateTime endTime, DateTime actualTime)/////string
         {
@@ -604,18 +605,22 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return null;
             }
 
-            int tfTotalMinutes = (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes;// надо или нет
+            int tfTotalMinutes = (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes;
 
             if (!CheckTf(tfTotalMinutes))
             {
                 return null;
             }
+            long candleCount = GetCountCandlesFromPeriod(startTime, endTime, timeFrameBuilder.TimeFrameTimeSpan);
 
             List<Candle> allCandles = new List<Candle>();
 
-            DateTime startTimeData = startTime;
-            DateTime endTimeData = startTimeData.AddMinutes(tfTotalMinutes * _limit);
-
+            //DateTime startTimeData = startTime;
+            //DateTime endTimeData = startTimeData.AddMinutes(tfTotalMinutes * _limit);
+            DateTime endTimeData = DateTime.UtcNow;
+            DateTime startTimeData = endTimeData.AddDays(-candleCount);
+            
+             
             do
             {
                 long from = TimeManager.GetTimeStampMilliSecondsToDateTime(startTimeData);
@@ -623,7 +628,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 string interval = GetInterval(timeFrameBuilder.TimeFrameTimeSpan);
 
-                List<Candle> candles = RequestCandleHistory(security.Name, interval, from, to);
+                List<Candle> candles = GetCandleHistory(security.Name, interval, from, to, candleCount);
 
                 if (candles == null || candles.Count == 0)
                 {
@@ -647,8 +652,9 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 allCandles.AddRange(candles);
 
-                startTimeData = endTimeData.AddMinutes(tfTotalMinutes);
-                endTimeData = startTimeData.AddMinutes(tfTotalMinutes * _limit);
+                startTimeData = endTime.AddMinutes(-candleCount); /*endTimeData.AddMinutes(tfTotalMinutes);*/
+                endTimeData = DateTime.UtcNow; /*startTimeData.AddMinutes(tfTotalMinutes * _limit);*/
+               
 
                 if (startTimeData >= DateTime.UtcNow)/////5555
                 {
@@ -696,19 +702,21 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return null;
             }
         }
-
-        private List<Candle> RequestCandleHistory(string nameSec, string tf, long startTime1, long endTime1)
+    
+        private List<Candle> GetCandleHistory(string nameSec, string tf, long startTime, long endTime,long countToLoad)
         {
             
             _rateGateCandleHistory.WaitToProceed();
-            int limit = 10000;
+            // int limit = 10000;
 
             //string nameSec = "tBTCUSD"; // Считываем символ пары
-            long startTime = 1733270400000;
-            long endTime = 1733761617719;
+            //long startTime = 1733270400000;
+            //long endTime = 1733761617719;
             //1733270400000
 
-            string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?start={startTime}&end={endTime}&limit={limit}";
+            //  string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?start={startTime}&end={endTime}&limit={limit}";
+
+            string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?start={startTime}&end={endTime}&limit={countToLoad}";
 
             RestClient client = new RestClient(_baseUrl);
             var request = new RestRequest(_apiPath, Method.GET);
@@ -736,20 +744,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     {
                         List<object> candleData = candles[i];
 
-                       
-
-                        if (candleData == null)
-                        //if (candleData[0] == null || candleData[1] == null ||
-                        //    candleData[2] == null ||  candleData[3] == null ||
-                        //    candleData[4] == null || candleData[5] == null)
-
-                        {
-                            SendLogMessage("Candle data contains null values", LogMessageType.Error);
-
-                            continue;
-                        }
-         
-
+                      
                         BitfinexCandle newCandle = new BitfinexCandle();
 
                         newCandle.Mts = candleData[0].ToString();
@@ -813,7 +808,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                         candles.Add(newCandle);
                     }
-                    catch (FormatException exception)
+                    catch (Exception exception)
                     {
                         SendLogMessage($"Format exception: {exception.Message}", LogMessageType.Error);
                     }
@@ -842,34 +837,34 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
             return false;
         }
-        //private long GetCountCandlesFromSliceTime(DateTime startTime, DateTime endTime, TimeSpan tf)
-        //{
+        private long GetCountCandlesFromPeriod(DateTime startTime, DateTime endTime, TimeSpan tf)
+        {
 
-        //    TimeSpan timeSlice = endTime - startTime;
+            TimeSpan timeSlice = endTime - startTime;
 
 
-        //    if (tf.Days > 0)
-        //    {
+            if (tf.Days > 0)
+            {
 
-        //        return Convert.ToInt64(timeSlice.TotalDays / tf.TotalDays);
-        //    }
-        //    else if (tf.Hours > 0)
-        //    {
+                return Convert.ToInt64(timeSlice.TotalDays / tf.TotalDays);
+            }
+            else if (tf.Hours > 0)
+            {
 
-        //        return Convert.ToInt64(timeSlice.TotalHours / tf.TotalHours);
-        //    }
-        //    else if (tf.Minutes > 0)
-        //    {
+                return Convert.ToInt64(timeSlice.TotalHours / tf.TotalHours);
+            }
+            else if (tf.Minutes > 0)
+            {
 
-        //        return Convert.ToInt64(timeSlice.TotalMinutes / tf.TotalMinutes);
-        //    }
-        //    else
-        //    {
+                return Convert.ToInt64(timeSlice.TotalMinutes / tf.TotalMinutes);
+            }
+            else
+            {
 
-        //        SendLogMessage(" Timeframe must be defined in days, hours, or minutes.", LogMessageType.Error);
-        //    }
-        //    return 0;
-        //}
+                SendLogMessage(" Timeframe must be defined in days, hours, or minutes.", LogMessageType.Error);
+            }
+            return 0;
+        }
 
         #endregion
 
