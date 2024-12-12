@@ -353,7 +353,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
                 if (candleLast.TimeStart == candleNow.TimeStart)
                 {
-                    SetNewError("Error 10. Candle time is equal! " + timeFrame.ToString() + "Security: " + sec);
+                    SetNewError("Error 10. Candle time is equal! " + timeFrame.ToString() + "Security: " + sec + candleLast.TimeStart + candleNow.TimeStart);
                     return false;
                 }
             }
