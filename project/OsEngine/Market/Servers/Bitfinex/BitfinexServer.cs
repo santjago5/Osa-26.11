@@ -1,6 +1,7 @@
 ﻿
 
 
+using Google.Protobuf.WellKnownTypes;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OsEngine.Entity;
@@ -587,120 +588,53 @@ namespace OsEngine.Market.Servers.Bitfinex
             return null;
         }
 
-        //public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
-        //{
-        //    int tfTotalMinutes = (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes;
-        //    DateTime endTime = DateTime.Now;
-        //    DateTime startTime = endTime.AddMinutes(-candleCount);
-
-        //    return GetCandleDataToSecurity(security, timeFrameBuilder, startTime, endTime, startTime);
-
-        //}
-
-        //private int _limit = 10000;
-
-        // public List<Candle> GetCandleDataToSecurity(Security security, TimeFrameBuilder timeFrameBuilder, DateTime startTime, DateTime endTime, DateTime actualTime)/////string
-        // {
-        //     if (!CheckTime(startTime, endTime, actualTime))
-        //     {
-        //         return null;
-        //     }
-
-        //     int tfTotalMinutes = (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes;
-
-        //     if (!CheckTf(tfTotalMinutes))
-        //     {
-        //         return null;
-        //     }
-        //     long candleCount = GetCountCandlesFromPeriod(startTime, endTime, timeFrameBuilder.TimeFrameTimeSpan);
-
-        //     List<Candle> allCandles = new List<Candle>();
-
-        //     //DateTime startTimeData = startTime;
-        //     //DateTime endTimeData = startTimeData.AddMinutes(tfTotalMinutes * _limit);
-        //     DateTime endTimeData = DateTime.UtcNow;
-        //     DateTime startTimeData = endTimeData.AddMinutes(-candleCount);
-
-
-        //     do
-        //     {
-        //         long from = TimeManager.GetTimeStampMilliSecondsToDateTime(startTimeData);
-        //         long to = TimeManager.GetTimeStampMilliSecondsToDateTime(endTimeData);
-
-        //         string interval = GetInterval(timeFrameBuilder.TimeFrameTimeSpan);
-
-        //         List<Candle> candles = GetCandleHistory(security.Name, interval, from, to, candleCount);
-
-        //         if (candles == null || candles.Count == 0)
-        //         {
-        //             break;
-        //         }
-
-        //         Candle last = candles[candles.Count - 1];
-
-        //         if (last.TimeStart >= endTime)
-
-        //         {
-        //             for (int i = 0; i < candles.Count; i++)
-        //             {
-        //                 if (candles[i].TimeStart <= endTime)
-        //                 {
-        //                     allCandles.Add(candles[i]);
-        //                 }
-        //             }
-        //             break;
-        //         }
-
-        //         allCandles.AddRange(candles);
-
-        //         startTimeData = endTime.AddMinutes(-candleCount); /*endTimeData.AddMinutes(tfTotalMinutes);*/
-        //         endTimeData = DateTime.UtcNow; /*startTimeData.AddMinutes(tfTotalMinutes * _limit);*/
-
-
-        //         if (startTimeData >= DateTime.UtcNow)/////5555
-        //         {
-        //             break;
-        //         }
-
-        //         if (endTimeData > DateTime.Now)
-        //         {
-        //             endTimeData = DateTime.Now;
-        //         }
-
-        //     } while (true);
-
-        //     return allCandles;
-        // }
 
         public List<Candle> GetCandleHistory(string nameSec, TimeSpan tf, bool IsOsData, int CountToLoad, DateTime timeEnd)
         {
+            int limit = 10000;
             int needToLoadCandles = CountToLoad;
             List<Candle> allCandles = new List<Candle>();
+            HashSet<DateTime> uniqueTimes = new HashSet<DateTime>();
+            DateTime startTime = timeEnd - TimeSpan.FromMinutes(tf.TotalMinutes * CountToLoad);
 
-            DateTime currentStart = timeEnd - TimeSpan.FromMinutes(tf.TotalMinutes * CountToLoad);
+            // DateTime currentStart = timeEnd - TimeSpan.FromMinutes(tf.TotalMinutes * CountToLoad);
+            
 
-            while (needToLoadCandles > 0)
+            while (startTime < timeEnd)/*(needToLoadCandles > 0)*/ //
+
             {
-                int batchSize = Math.Min(needToLoadCandles, 10000);
-                DateTime endDate = currentStart.AddMinutes(tf.TotalMinutes * batchSize);
+                int batchSize = Math.Min(needToLoadCandles, limit);
 
-                var rangeCandles = CreateQueryCandles(nameSec, GetInterval(tf), currentStart, endDate, batchSize);
+                DateTime curTime = startTime.AddMinutes(tf.TotalMinutes * batchSize);
+
+                DateTime currentEnd = curTime < timeEnd ? curTime : timeEnd;
+
+                // DateTime endDate = currentStart.AddMinutes(tf.TotalMinutes * batchSize);
+
+               
+              
+                var rangeCandles = CreateQueryCandles(nameSec, GetInterval(tf), startTime, currentEnd, batchSize);
 
                 if (rangeCandles == null || rangeCandles.Count == 0)
                 {
-                    break; 
+                    break;
                 }
 
-                foreach (var candle in rangeCandles)
-                {
-                    if (!allCandles.Any(c => c.TimeStart == candle.TimeStart))
-                    {
-                        allCandles.Add(candle);
-                    }
-                }
+                 allCandles.AddRange(rangeCandles);
+                    
+                 var rangeCandlesFirst =  rangeCandles.First().TimeStart;
+                 var rangeCandlesLast =  rangeCandles.Last().TimeStart;
 
-                currentStart = rangeCandles.Last().TimeStart.AddMinutes(tf.TotalMinutes);
+             
+                startTime = rangeCandles.Last().TimeStart.AddMinutes(tf.TotalMinutes);
+
                 needToLoadCandles -= rangeCandles.Count;
+
+                if (startTime >= timeEnd)
+                {
+                    break;
+                }
+
             }
 
             return allCandles;
@@ -708,81 +642,19 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
         {
-            DateTime timeStart = DateTime.UtcNow - TimeSpan.FromMinutes(timeFrameBuilder.TimeFrameTimeSpan.Minutes * candleCount);
+            int tfTotalMinutes = (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes;
+
+            if (!CheckTf(tfTotalMinutes))
+            {
+                return null;
+            }
+
+            // DateTime timeStart = DateTime.UtcNow - TimeSpan.FromMinutes(timeFrameBuilder.TimeFrameTimeSpan.Minutes * candleCount);
+            DateTime timeStart = DateTime.UtcNow - TimeSpan.FromMinutes(tfTotalMinutes * candleCount);
             DateTime timeEnd = DateTime.UtcNow;
 
             return GetCandleDataToSecurity(security, timeFrameBuilder, timeStart, timeEnd, timeStart);
         }
-
-        //       public List<Candle> GetCandleHistory(string nameSec, TimeSpan tf, bool IsOsData, int CountToLoad, DateTime timeEnd)
-        //       {
-
-        //           int needToLoadCandles = CountToLoad;
-
-
-        //           List<Candle> allCandles = new List<Candle>();
-        //           DateTime startDate = timeEnd - TimeSpan.FromMinutes(tf.TotalMinutes * CountToLoad);
-
-        //DateTime currentStart = startDate;
-
-        //           do
-        //           {
-
-        //               int limit = 10000;
-        //               //int limit = needToLoadCandles;
-        //               int batchSize = Math.Min(needToLoadCandles, limit);
-
-        //               //if (needToLoadCandles > 10000) // For each query, the system would return at most 10000 pieces of data. To obtain more data, please page the data by time.
-        //               //{
-        //               //    limit = 10000;
-        //               //}
-
-        //               List<Candle> rangeCandles = new List<Candle>();
-        //               //int candlesToLoad = totalCandles; // Остаток свечей для загрузки
-        //               // Текущая начальная дата
-        //                                                  // Рассчитываем конечную дату диапазона
-        //               DateTime endDate = currentStart.AddMinutes(tf.TotalMinutes * batchSize);
-
-        //               //if (!rangeCandles.Any())
-        //               //{
-        //               //    DateTime fromTime1 = fromTime + TimeSpan.FromMinutes(tf.TotalMinutes * limit);
-
-        //               //    rangeCandles = CreateQueryCandles(nameSec, GetInterval(tf), fromTime1, limit);// Действия, если список пуст
-        //               //}
-
-        //               rangeCandles = CreateQueryCandles(nameSec, GetInterval(tf), startDate, endDate, limit);//{01.10.2024 0:00:00}   {31.10.2024 
-
-
-
-        //               if (rangeCandles == null || rangeCandles.Count == 0)
-        //               {
-        //                   return null;
-        //               }
-
-        //               // rangeCandles.Reverse();///
-
-
-        //               // candles.InsertRange(0, rangeCandles);//10000
-        //               allCandles.AddRange(rangeCandles);
-
-        //               if (allCandles.Count != 0)
-        //               {
-        //                  currentStart = rangeCandles.Last().TimeStart;
-        //               }
-
-
-        //               //if (allCandles.Count != 0)
-        //               //{
-        //               //    timeEnd = allCandles[0].TimeStart;///30.09.2024 21:00:00
-        //               //}
-
-        //               needToLoadCandles -= rangeCandles.Count;//36490/// rangeCandles
-
-        //           } while (needToLoadCandles > 0);
-
-
-        //           return allCandles;
-        //       }
 
         public List<Candle> GetCandleDataToSecurity(Security security, TimeFrameBuilder timeFrameBuilder, DateTime startTime, DateTime endTime, DateTime actualTime)
         {
@@ -791,10 +663,16 @@ namespace OsEngine.Market.Servers.Bitfinex
                 startTime = actualTime;
             }
 
+            if (!CheckTime(startTime, endTime, actualTime))
+            {
+                return null;
+            }
+
+
             int countNeedToLoad = GetCountCandlesFromPeriod(startTime, endTime, timeFrameBuilder.TimeFrameTimeSpan);
+
             return GetCandleHistory(security.NameFull, timeFrameBuilder.TimeFrameTimeSpan, true, countNeedToLoad, endTime);
         }
-
 
         private bool CheckTime(DateTime startTime, DateTime endTime, DateTime actualTime)
         {
@@ -808,6 +686,21 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
             return true;
         }
+
+        private bool CheckTf(int timeFrameMinutes)
+        {
+            if (timeFrameMinutes == 1 ||
+                timeFrameMinutes == 5 ||
+                timeFrameMinutes == 15 ||
+                timeFrameMinutes == 30 ||
+                timeFrameMinutes == 60 ||
+                timeFrameMinutes == 1440)
+            {
+                return true;
+            }
+            return false;
+        }
+
         private string GetInterval(TimeSpan tf)
         {
 
@@ -853,26 +746,21 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
 
 
-        private List<Candle> CreateQueryCandles(string nameSec, string tf, DateTime startTime, DateTime endTime, int limit)//1733356800000//1736356800000
-
-        {//31/10/24 00*00// 2024-11-06 22*40
-
+        private List<Candle> CreateQueryCandles(string nameSec, string tf, DateTime startTime, DateTime endTime, int limit)
+        {
+            //31.10.2024 0:00:00  06.11.2024 22:40:00
             _rateGateCandleHistory.WaitToProceed();
-            // Преобразуем DateTime в временную метку Unix (в миллисекундах)
-
             long startDate = (long)(startTime.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalMilliseconds;
             long endDate = (long)(endTime.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalMilliseconds;
 
             // long startMillis = new DateTimeOffset(currentStart).ToUnixTimeMilliseconds();
 
-            // https://api-pub.bitfinex.com/v2/candles/trade:5m:tBTCUSD/hist?limit;лимит
-            //string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?start={startTime}&end={endTime}&limit={limit}";
-            // string _apiPath = $"/v2/candles/trade:{5m}:{"tBTCUSD"}/hist?start={1732903200000}&end={1732914000000}";
-            // https://api-pub.bitfinex.com/v2/candles/trade%3A1m%3AtBTCUSD/hist?sort=1&start=1732903200000&limit=100
-            //string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?start={fromTime1}&end={timeEnd1}&limit={limit}";
 
-           // string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?sort=1&start={startDate}&end={endDate}&limit={limit}";
-            string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?sort=1&start={startDate}&limit={limit}";
+
+            // string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?sort=1&start={startDate}&end={endDate}&limit={limit}";
+            // string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?sort=1&start={startDate}&limit={limit}";
+
+            string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?start={startDate}&limit={limit}";
 
             RestClient client = new RestClient(_baseUrl);
             var request = new RestRequest(_apiPath, Method.GET);
@@ -912,7 +800,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         candleList.Add(newCandle);
                     }
 
-                    // candleList.Reverse();
+
 
                     return ConvertToCandles(candleList);
                 }
@@ -970,7 +858,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         SendLogMessage($"Format exception: {exception.Message}", LogMessageType.Error);
                     }
                 }
-                //  candles.Reverse();
+                candles.Reverse();
 
                 return candles;
             }
@@ -981,19 +869,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        private bool CheckTf(int timeFrameMinutes)
-        {
-            if (timeFrameMinutes == 1 ||
-                timeFrameMinutes == 5 ||
-                timeFrameMinutes == 15 ||
-                timeFrameMinutes == 30 ||
-                timeFrameMinutes == 60 ||
-                timeFrameMinutes == 1440)
-            {
-                return true;
-            }
-            return false;
-        }
 
         #endregion
 

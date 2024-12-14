@@ -530,7 +530,8 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
                         "Error 19. The time distance between the candles is wrong. TimeFrame: " + timeFrame.ToString() +
                         " Good distance: " + goodTimeSpan.ToString() +
                         " Real distance: " + span.ToString() +
-                        " CandleTime: " + candleNow.TimeStart.ToString());
+                        " CandleTime: " + candleNow.TimeStart.ToString()+SecName
+                        );
                     return;
 
                 }
