@@ -656,11 +656,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                         return null;
                     }
 
-                    List<Trade>trades  = new List<Trade>();
+                    List<Trade> trades  = new List<Trade>();
 
                     for (int i = 0; i < tradeList.Count; i++)
                     {
                         Trade newTrade = new Trade();
+                        newTrade.Id = tradeList[i][0].ToString();
                         newTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(tradeList[i][1]));
                         newTrade.SecurityNameCode = security;
                         decimal amount = tradeList[i][2].ToString().ToDecimal();
@@ -673,13 +674,19 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                     return trades;
                 }
+                else
+                {
+                    // Логируем ошибку, если статус не OK
+                    SendLogMessage($"API вернул ошибку: {response.StatusCode} - {response.Content}", LogMessageType.Error);
+                    return null; // Возвращаем пустой список при ошибке
+                }
             }
             catch (Exception e)
             {
                 SendLogMessage(e.ToString(), LogMessageType.Error);
-                return null;
+              return null;
             }
-
+      
         }
 
         public List<Candle> GetCandleHistory(string nameSec, TimeSpan tf, bool isOsData, int countToLoad, DateTime timeEnd)
