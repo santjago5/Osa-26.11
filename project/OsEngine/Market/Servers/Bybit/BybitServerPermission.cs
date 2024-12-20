@@ -85,7 +85,7 @@ namespace OsEngine.Market.Servers.Bybit
         }
         public bool DataFeedTfTickCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
         public bool DataFeedTfMarketDepthCanLoad
         {
