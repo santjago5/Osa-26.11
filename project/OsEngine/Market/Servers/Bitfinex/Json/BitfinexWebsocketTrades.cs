@@ -56,5 +56,22 @@ namespace OsEngine.Market.Servers.Bitfinex.Json
         public string Cid { get; set; }//LONG
     }
 
+    class BitfinexAuthResponseWebSocket
+    {
+        public string Event { get; set; }
+        public string Status { get; set; }
+        public string ChanId { get; set; }
+        public string UserId { get; set; }
+        public string AuthId { get; set; }
+        public string Msg { get; set; }
+    }
 
+    public class WalletData
+    {
+        public string WalletType { get; set; } // Тип кошелька (например, "exchange", "margin")
+        public string Currency { get; set; }   // Валюта (например, "USD", "BTC")
+        public decimal Balance { get; set; }   // Общий баланс
+        public decimal UnsettledInterest { get; set; } // Непогашенный интерес
+        public decimal BalanceAvailable { get; set; }  // Доступный баланс
+    }
 }
