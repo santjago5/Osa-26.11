@@ -570,7 +570,7 @@ namespace OsEngine.Market.Servers
                 return;
             }
 
-            for (int i = 0;i < _ordersActiv.Count;i++)
+            for (int i = 0;i < _ordersActiv.Count;i++)/////почему 0
             {
                 CheckOrderState(_ordersActiv[i]);
             }
