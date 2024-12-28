@@ -35,8 +35,6 @@ using Trade = OsEngine.Entity.Trade;
 using WebSocket = WebSocket4Net.WebSocket;
 using WebSocketState = WebSocket4Net.WebSocketState;
 using Timer = System.Timers.Timer;
-using Kraken.WebSockets;
-using System.Globalization;
 using WebSocketSharp;
 
 
@@ -2095,21 +2093,21 @@ namespace OsEngine.Market.Servers.Bitfinex
                         UpdateMyTrade(message);
                     }
 
-                    if (message.Contains("[0,\"ou\",[") /*|| (message.Contains("[0,\"oc\",["))*/)
+                    if (message.Contains("[0,\"ou\",[") || (message.Contains("[0,\"oc\",[")))
                     {
                         UpdateOrder(message);
                     }
-
+                   
                     //if (message.Contains("[0,\"wu\",["))
                     //{
 
-                    //    UpdatePortfolio(message);
-                    //}
+                        //    UpdatePortfolio(message);
+                        //}
 
-                    //if (message.Contains("ws"))
-                    //{
-                    //    // UpdatePortfolio(message);
-                    //}
+                        //if (message.Contains("ws"))
+                        //{
+                        //    // UpdatePortfolio(message);
+                        //}
                 }
                 catch (Exception exception)
                 {
@@ -2118,76 +2116,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        //private void UpdateMyTrade(string message)
-        //{
-        //    try
-        //    {
-        //        List<object> tradyList = JsonConvert.DeserializeObject<List<object>>(message);
-
-        //        if (tradyList == null)
-        //        {
-        //            return;
-        //        }
-
-        //        // Преобразуем в нужную структуру данных
-        //        int chanId = Convert.ToInt32(tradyList[0]);
-        //        string msgType = Convert.ToString(tradyList[1]);
-        //        var tradeData = ((JArray)tradyList[2]).ToObject<List<object>>(); 
-
-        //        //var trade = new Trade
-        //        //{
-        //        //    Id = (tradeData[0]).ToString(),
-        //        //    Symbol = Convert.ToString(tradeData[1]),
-        //        //    MtsCreate = Convert.ToInt64(tradeData[2]),
-        //        //    OrderId = Convert.ToInt64(tradeData[3]),
-        //        //    ExecAmount = Convert.ToDouble(tradeData[4]),
-        //        //    ExecPrice = Convert.ToDouble(tradeData[5]),
-        //        //    OrderType = Convert.ToString(tradeData[6]),
-        //        //    OrderPrice = Convert.ToDouble(tradeData[7]),
-        //        //    Maker = Convert.ToInt32(tradeData[8]),
-        //        //    Fee = Convert.ToDouble(tradeData[9]),
-        //        //    FeeCurrency = Convert.ToString(tradeData[10]),
-        //        //    Cid = Convert.ToInt64(tradeData[11])
-        //        //};
-
-        //        // Создаем окончательный объект
-
-
-
-        //        List<BitfinexMyTrade> ListMyTrade = new List<BitfinexMyTrade>();
-
-        //        for (int i = 0; i < tradyList.Count; i++)
-        //        {
-        //            List<object> item = tradyList[i];
-
-        //            BitfinexMyTrade response = new BitfinexMyTrade();//{}
-
-
-        //            MyTrade myTrade = new MyTrade();
-
-        //            myTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(response.MtsCreate));
-        //            myTrade.SecurityNameCode = response.Symbol;
-        //            myTrade.NumberOrderParent = response.Cid;//что тут должно быть
-        //            myTrade.Price = response.OrderPrice.ToDecimal();
-        //            myTrade.NumberTrade = response.OrderId;
-        //            //myTrade.Side = response.ExecAmount.Contains("-") ? Side.Sell : Side.Buy;
-        //            myTrade.Side = Convert.ToInt32(response.ExecAmount) > 0 ? Side.Buy : Side.Sell;
-
-        //            // при покупке комиссия берется с монеты и объем уменьшается и появляются лишние знаки после запятой
-        //            decimal preVolume = myTrade.Side == Side.Sell ? response.ExecAmount.ToDecimal() : response.ExecAmount.ToDecimal() - response.Fee.ToDecimal();
-
-        //            myTrade.Volume = GetVolumeForMyTrade(response.Symbol, preVolume);
-
-        //            MyTradeEvent?.Invoke(myTrade);
-
-        //            SendLogMessage(myTrade.ToString(), LogMessageType.Trade);
-        //        }
-        //    }
-        //    catch (Exception exception)
-        //    {
-        //        SendLogMessage(exception.ToString(), LogMessageType.Error);
-        //    }
-        //}
         private void UpdateMyTrade(string message)
         {
             try
@@ -2247,8 +2175,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-
-
         //округление объемом
         private readonly Dictionary<string, int> _decimalVolume = new Dictionary<string, int>();
         // метод для округления знаков после запятой
@@ -2297,20 +2223,20 @@ namespace OsEngine.Market.Servers.Bitfinex
                 List<object> orderDataList = orderArray.ToObject<List<object>>();
                 //var orderData = ((JArray)rootArray[2]).ToObject<List<object>>();
 
-
-                if (orderDataList == null )
+                if (orderDataList == null)
                 {
                     return;
                 }
 
                 // Создаем объект ордера
-                Order updateOrder = new Order();
 
-                updateOrder.SecurityNameCode = Convert.ToString(orderDataList[3]); // SYMBOL
+                //[0, "oc", [190144474536, null, 1735326874987, "tTRXUSD", 1735326874987, 1735326874989, 0, -22, "EXCHANGE LIMIT", null, null, null, 0, "EXECUTED @ 0.26158(-22.0)", null, null, 0.26156, 0.26158, 0, 0, null, null, null, 0, 0, null, null, null, "API>BFX", null, null,{ }]]
+                Order updateOrder = new Order();
+                updateOrder.SecurityNameCode = (orderDataList[3]).ToString(); // SYMBOL
                 updateOrder.TimeCreate = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderDataList[4])); // MTS_CREATE
-                updateOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderDataList[5])); // MTS_UPDATE
+                updateOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderDataList[5])); // MTS_UPDATE                        
                 updateOrder.NumberUser = Convert.ToInt32(orderDataList[2]); // CID
-                updateOrder.NumberMarket = Convert.ToString(orderDataList[0]); // ID
+                updateOrder.NumberMarket = (orderDataList[0]).ToString(); // ID
                 updateOrder.Side = (orderDataList[6]).ToString().ToDecimal() < 0 ? Side.Sell : Side.Buy; // SIDE
                 updateOrder.State = GetOrderState(Convert.ToString(orderDataList[13])); // STATUS
                 updateOrder.TypeOrder = Convert.ToString(orderDataList[8]).Equals("EXCHANGE MARKET", StringComparison.OrdinalIgnoreCase)
@@ -2328,6 +2254,13 @@ namespace OsEngine.Market.Servers.Bitfinex
                 if (updateOrder.State == OrderStateType.Done || updateOrder.State == OrderStateType.Partial)
                 {
                     GetMyTradesBySecurity(updateOrder.SecurityNameCode, updateOrder.NumberMarket);
+                }
+                if (updateOrder.State == OrderStateType.Cancel)
+                {
+                   updateOrder.State = OrderStateType.Cancel;
+                   SendLogMessage($"Order canceled Successfully. Order ID:{updateOrder.NumberMarket}", LogMessageType.Trade);
+
+                    GetPortfolios();
                 }
 
                 MyOrderEvent?.Invoke(updateOrder);
@@ -2396,8 +2329,8 @@ namespace OsEngine.Market.Servers.Bitfinex
             string _apiPath = "v2/auth/w/order/submit";
             BitfinexOrderData newOrder = new BitfinexOrderData();
 
-            newOrder.Cid = order.NumberUser.ToString();
-
+            newOrder.Cid = order.NumberUser.ToString();//726
+            
             newOrder.Symbol = order.SecurityNameCode;
 
             order.PortfolioNumber = "BitfinexPortfolio";
@@ -2429,13 +2362,20 @@ namespace OsEngine.Market.Servers.Bitfinex
                 newOrder.Amount = (order.Volume).ToString().Replace(",", ".");
             }
 
-            string body = $"{{\"type\":\"{newOrder.OrderType}\",\"symbol\":\"{newOrder.Symbol}\",\"amount\":\"{newOrder.Amount}\",\"price\":\"{newOrder.Price}\"}}";
+             string body = $"{{\"type\":\"{newOrder.OrderType}\",\"symbol\":\"{newOrder.Symbol}\",\"amount\":\"{newOrder.Amount}\",\"price\":\"{newOrder.Price}\",\"cid\":{newOrder.Cid}}}";
+            //var body = $"{{\"type\":\"{newOrder.OrderType}\"," +
+            //      $"\"symbol\":\"{newOrder.Symbol}\"," +
+            //      $"\"amount\":\"{newOrder.Amount}\"," +
+            //      $"\"price\":\"{newOrder.Price}\"," +
+            //      $"\"cid\":{newOrder.Cid}}}";
+
 
             string signature = $"/api/{_apiPath}{nonce}{body}";
 
             var client = new RestClient(_baseUrl);
             var request = new RestRequest(_apiPath, Method.POST);
             string sig = ComputeHmacSha384(_secretKey, signature);
+
 
             request.AddHeader("accept", "application/json");
             request.AddHeader("bfx-nonce", nonce);
