@@ -2250,10 +2250,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 updateOrder.VolumeExecute = (orderDataList[7]).ToString().ToDecimal(); // AMOUNT_ORIG
                 updateOrder.PortfolioNumber = "BitfinexPortfolio";
               
-
                 SendLogMessage($"Order updated: {updateOrder.NumberMarket}, Status: {updateOrder.State}", LogMessageType.Trade);
 
-                // Если ордер исполнен или частично исполнен, обновляем сделку
                 if (updateOrder.State == OrderStateType.Done || updateOrder.State == OrderStateType.Partial)
                 {
                     GetMyTradesBySecurity(updateOrder.SecurityNameCode, updateOrder.NumberMarket);
@@ -2262,8 +2260,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 if (updateOrder.State == OrderStateType.Cancel)
                 {
                     updateOrder.State = OrderStateType.Cancel;
-                    SendLogMessage($"Order canceled Successfully. Order ID:{updateOrder.NumberMarket}", LogMessageType.Trade);
 
+                    SendLogMessage($"Order canceled Successfully. Order ID:{updateOrder.NumberMarket}", LogMessageType.Trade);
                 }
                 GetPortfolios();
                
@@ -2414,7 +2412,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     {
                         order.NumberMarket = orders[0].ToString();//190240109337
                         order.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orders[4]));
-                        order.State = GetOrderState(status);
+                        order.State = GetOrderState(status); 
 
                         SendLogMessage($"Order number {order.NumberMarket} on exchange.", LogMessageType.Trade);
                     }
@@ -2823,7 +2821,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        private Order GetOrderHistoryById(string OrderId)//111111111111111111111111111111
+        private Order GetOrderHistoryById(string OrderId)//нет ордер id
         {
             // https://api.bitfinex.com/v2/auth/r/orders/hist
             string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
@@ -2881,6 +2879,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                             newOrder.Volume = volume;
                         }
                         newOrder.Price = orderData[16].ToString().ToDecimal();
+                       // newOrder.Price = order.TypeOrder == OrderPriceType.Market ? null : order.Price.ToString().Replace(",", ".");
                         newOrder.PortfolioNumber = "BitfinexPortfolio";
                         newOrder.VolumeExecute = orderData[7].ToString().ToDecimal();
 
