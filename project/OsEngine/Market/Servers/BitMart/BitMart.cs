@@ -1542,11 +1542,11 @@ namespace OsEngine.Market.Servers.BitMart
 
         #region 11 Trade
 
-        private RateGate _rateGateSendOrder = new RateGate(90, TimeSpan.FromMinutes(1));
+        private RateGate _rateGateSendOrder = new RateGate(1, TimeSpan.FromMilliseconds(90));
 
-        private RateGate _rateGateCancelOrder = new RateGate(90, TimeSpan.FromMinutes(1));
+        private RateGate _rateGateCancelOrder = new RateGate(1, TimeSpan.FromMilliseconds(300));
 
-        private RateGate _rateGateGetOrder = new RateGate(90, TimeSpan.FromMinutes(1));
+        private RateGate _rateGateGetOrder = new RateGate(1, TimeSpan.FromMilliseconds(300));
 
         public void SendOrder(Order order)
         {
