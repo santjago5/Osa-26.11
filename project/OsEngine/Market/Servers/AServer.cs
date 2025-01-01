@@ -859,7 +859,7 @@ namespace OsEngine.Market.Servers
 
                                 for (int i = 0; i < _myTrades.Count; i++)
                                 {
-                                    if (_myTrades[i].NumberOrderParent == order.NumberMarket)
+                                    if (_myTrades[i].NumberOrderParent == order.NumberMarket)////////////
                                     {
                                         _myTradesToSend.Enqueue(_myTrades[i]);
                                     }
