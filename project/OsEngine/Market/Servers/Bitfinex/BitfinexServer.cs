@@ -2233,6 +2233,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 //[0, "oc", [190144474536, null, 1735326874987, "tTRXUSD", 1735326874987, 1735326874989, 0, -22, "EXCHANGE LIMIT", null, null, null, 0, "EXECUTED @ 0.26158(-22.0)", null, null, 0.26156, 0.26158, 0, 0, null, null, null, 0, 0, null, null, null, "API>BFX", null, null,{ }]]
                 Order updateOrder = new Order();
+
                 updateOrder.SecurityNameCode = (orderDataList[3]).ToString(); // SYMBOL
                 updateOrder.TimeCreate = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderDataList[4])); // MTS_CREATE
                 updateOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderDataList[5])); // MTS_UPDATE                        
@@ -2248,10 +2249,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 updateOrder.ServerType = ServerType.Bitfinex;
                 updateOrder.VolumeExecute = (orderDataList[7]).ToString().ToDecimal(); // AMOUNT_ORIG
                 updateOrder.PortfolioNumber = "BitfinexPortfolio";
-                //if (orderDataList[8].Equals("EXCHANGE MARKET") && orderDataList[13] == OrderStateType.Active)
-                //{
-                //    return;
-                //}
+              
 
                 SendLogMessage($"Order updated: {updateOrder.NumberMarket}, Status: {updateOrder.State}", LogMessageType.Trade);
 
@@ -2266,10 +2264,9 @@ namespace OsEngine.Market.Servers.Bitfinex
                     updateOrder.State = OrderStateType.Cancel;
                     SendLogMessage($"Order canceled Successfully. Order ID:{updateOrder.NumberMarket}", LogMessageType.Trade);
 
-
                 }
                 GetPortfolios();
-
+               
                 MyOrderEvent?.Invoke(updateOrder);
             }
             catch (Exception exception)
@@ -2281,39 +2278,34 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         private OrderStateType GetOrderState(string orderStateResponse)
         {
-            // Объявляем переменную для хранения состояния ордера
-            OrderStateType stateType = OrderStateType.None; // Начальное состояние
+            // Инициализируем состояние по умолчанию
+            OrderStateType stateType = OrderStateType.None;
 
-            switch (orderStateResponse)
+            // Проверяем, содержит ли строка ключевые слова состояния
+            if (orderStateResponse.StartsWith("ACTIVE"))
             {
-                case "ACTIVE":
-                    stateType = OrderStateType.Active; // Активный ордер
-                    break;
-
-                case "EXECUTED":
-                    stateType = OrderStateType.Done; // Исполненный ордер
-                    break;
-
-                case "REJECTED":
-                    stateType = OrderStateType.Fail; // Отклонённый ордер
-                    break;
-
-                case "CANCELED":
-                    stateType = OrderStateType.Cancel; // Отменённый ордер
-
-                    break;
-
-                case "PARTIALLY FILLED":
-                    stateType = OrderStateType.Partial; // Частично исполненный ордер
-                    break;
-
-                default:
-                    stateType = OrderStateType.None; // Неопределённое состояние
-                    break;
+                stateType = OrderStateType.Active;
+            }
+            else if (orderStateResponse.StartsWith("EXECUTED"))
+            {
+                stateType = OrderStateType.Done;
+            }
+            else if (orderStateResponse.StartsWith("REJECTED"))
+            {
+                stateType = OrderStateType.Fail;
+            }
+            else if (orderStateResponse.StartsWith("CANCELED"))
+            {
+                stateType = OrderStateType.Cancel;
+            }
+            else if (orderStateResponse.StartsWith("PARTIALLY FILLED"))
+            {
+                stateType = OrderStateType.Partial;
             }
 
             return stateType;
         }
+
 
         #endregion
 
@@ -2456,8 +2448,8 @@ namespace OsEngine.Market.Servers.Bitfinex
             MyOrderEvent?.Invoke(order);
         }
 
-        private readonly RateGate rateGateCancelAllOrder = new RateGate(90, TimeSpan.FromMinutes(1));//11111111111111111111111
-        public void CancelAllOrders()
+        private readonly RateGate rateGateCancelAllOrder = new RateGate(90, TimeSpan.FromMinutes(1));
+        public void CancelAllOrders()//11111111111111111111111
         {
             rateGateCancelAllOrder.WaitToProceed();
 
@@ -2493,6 +2485,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     if (responseJson.Contains("oc_multi-req"))
                     {
                         SendLogMessage($"All active orders canceled: {response.Content}", LogMessageType.Trade);
+                        
                         GetPortfolios();
                     }
 
@@ -2830,13 +2823,13 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        private Order GetOrderHistoryById(string numberId)//111111111111111111111111111111
+        private Order GetOrderHistoryById(string OrderId)//111111111111111111111111111111
         {
             // https://api.bitfinex.com/v2/auth/r/orders/hist
             string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-            string _apiPath = "v2/auth/r/orders";
+            string _apiPath = "v2/auth/r/orders/hist";
 
-            string body = $"{{\"id\":[{numberId}]}}";////надо или нет квадратные скобки
+            string body = $"{{\"id\":[{OrderId}]}}";////надо или нет квадратные скобки
 
             string signature = $"/api/{_apiPath}{nonce}{body}";
 
