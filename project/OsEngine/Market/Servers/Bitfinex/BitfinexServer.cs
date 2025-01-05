@@ -438,6 +438,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
 
             CreateQueryPortfolio();
+        
         }
 
         private void CreateQueryPortfolio()
@@ -507,7 +508,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        private void CreateQueryPosition(string orderId)
+        private void CreateQueryPosition()
         {
             _rateGatePositions.WaitToProceed();
 
@@ -530,7 +531,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     string responseBody = response.Content;
 
-                    UpdatePosition(responseBody); // Обновляем позиции  приходит пустой массив, если нет позиций
+                    UpdatePortfolio(responseBody); // Обновляем позиции  приходит пустой массив, если нет позиций
                 }
                 else
                 {
@@ -544,7 +545,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         }
 
-        private void UpdatePosition(string json)
+        private void UpdatePortfolio(string json)
         {
 
             List<List<object>> response = JsonConvert.DeserializeObject<List<List<object>>>(json);
@@ -1149,7 +1150,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 _webSocketPrivate.Error += WebSocketPrivate_Error;
 
                 _webSocketPrivate.Open();
-
 
 
             }
@@ -2067,6 +2067,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                         continue;
                     }
 
+                    if (message.Contains("hb"))
+                    {
+                        return;
+                    }
                     if (message.Contains("\"event\":\"info\""))
                     {
                         SendLogMessage("WebSocket opened", LogMessageType.System);
@@ -2086,28 +2090,36 @@ namespace OsEngine.Market.Servers.Bitfinex
                         }
                     }
 
+                    if (message.Contains("[0,\"ps\",["))
+                    {
+
+                    }
+
                     if (message.Contains("[0,\"tu\",["))
                     {
                         UpdateMyTrade(message);
                     }
 
-                    if (message.Contains("[0,\"ou\",[") || (message.Contains("[0,\"oc\",[")))
+                    if (message.Contains("[0,\"ou\",[") || (message.Contains("[0,\"oc\",["))) 
                     {
                         UpdateOrder(message);
                         //  UpdateOrder(newOsOrder.NumberMarket, newOsOrder.NumberUser);
 
                     }
-
+                    if (message.Contains("[0,\"os\",["))
+                    {
+                       // SnapshotPositions(message);
+                    }
                     //if (message.Contains("[0,\"wu\",["))
                     //{
 
-                    //    UpdatePortfolio(message);
-                    //}
+                        //    UpdatePortfolio(message);
+                        //}
 
-                    //if (message.Contains("ws"))
-                    //{
-                    //    // UpdatePortfolio(message);
-                    //}
+                        //if (message.Contains("ws"))
+                        //{
+                        //    // UpdatePortfolio(message);
+                        //}
                 }
                 catch (Exception exception)
                 {
@@ -2261,6 +2273,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     updateOrder.State = OrderStateType.Done;///////////////
 
                     GetMyTradesBySecurity(updateOrder.SecurityNameCode, updateOrder.NumberMarket);
+                    SendLogMessage($"Parsed order state: {updateOrder.State}", LogMessageType.Trade);
                 }
 
                 if (updateOrder.State == OrderStateType.Cancel)
@@ -2285,7 +2298,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         private OrderStateType GetOrderState(string orderStateResponse)
         {
             // Инициализируем состояние по умолчанию
-           OrderStateType stateType = OrderStateType.None;
+            OrderStateType stateType = OrderStateType.None;
 
             // Проверяем, содержит ли строка ключевые слова состояния
             if (orderStateResponse.StartsWith("ACTIVE"))
@@ -2438,7 +2451,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         SendLogMessage($"Order number {newOsOrder.NumberMarket} on exchange.", LogMessageType.Trade);
 
 
-                       // GetOrderStatus(newOsOrder);
+                        // GetOrderStatus(newOsOrder);
 
 
                         if (MyOrderEvent != null)
@@ -2447,8 +2460,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                         }
 
 
-                        // UpdateOrder(newOsOrder.NumberMarket, newOsOrder.NumberUser);
-                        WaitForOrderStatusViaWebSocket(newOsOrder.NumberMarket, newOsOrder.NumberUser);
 
                         GetPortfolios();
                     }
@@ -2471,10 +2482,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        private void WaitForOrderStatusViaWebSocket(string numberMarket, int numberUser)
-        {
-            //  UpdateOrder();
-        }
+      
 
         private void CreateOrderFail(Order order)
         {
@@ -2768,7 +2776,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                         orders.Add(activOrder);
 
-                        MyOrderEvent?.Invoke(orders[i]);
+                        //MyOrderEvent?.Invoke(orders[i]);
                     }
 
                 }
@@ -2799,13 +2807,13 @@ namespace OsEngine.Market.Servers.Bitfinex
             // Объявляем переменную для хранения ордера на рынке
             Order orderOnMarket = null;
 
-         
+
             if (orderFromActive != null)
             {
                 // Если ордер из активных ордеров найден, берём его данные
                 orderOnMarket = orderFromActive;
             }
-           else  if (orderFromHistory != null)
+            else if (orderFromHistory != null)
             {
                 // Если ордер не найден в активных ордерах, но есть в истории, берём его данные
                 orderOnMarket = orderFromHistory;
@@ -2821,10 +2829,10 @@ namespace OsEngine.Market.Servers.Bitfinex
             // Проверяем состояние ордера: если ордер выполнен (Done) или частично выполнен (Patrial)
             if (orderOnMarket.State == OrderStateType.Done || orderOnMarket.State == OrderStateType.Partial)
             {
+
                 // Получаем список сделок по номеру ордера
                 List<MyTrade> tradesBySecurity = GetMyTradesBySecurity(order.SecurityNameCode, order.NumberMarket);
 
-                // Если сделки не найдены, выходим из метода
                 if (tradesBySecurity == null)
                 {
                     return;
@@ -2850,13 +2858,13 @@ namespace OsEngine.Market.Servers.Bitfinex
                     MyTradeEvent?.Invoke(tradesByMyOrder[i]);
                 }
                 // Если ордер на рынке найден и существует обработчик события, вызываем событие MyOrderEvent
-              
-            }  MyOrderEvent?.Invoke(orderOnMarket);
+                MyOrderEvent?.Invoke(orderOnMarket);
+            }
         }
 
         private Order GetActiveOrder(string id)
         {
-          long orderId = Convert.ToInt64(id);
+            long orderId = Convert.ToInt64(id);
 
             // post https://api.bitfinex.com/v2/auth/r/orders
 
@@ -3212,22 +3220,14 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             List<Order> orders = GetAllActiveOrders();
 
-            if (orders == null)
-            {
-                return;
-            }
+           
 
             for (int i = 0; i < orders.Count; i++)
             {
-
-                if (orders[i].State != OrderStateType.Active
-                    && orders[i].State != OrderStateType.Partial
-                    && orders[i].State != OrderStateType.Pending)
-                {
-                    continue;
-                }
-
-
+                if (orders[i] == null)
+            {
+                return;
+            }
                 orders[i].TimeCallBack = orders[i].TimeCallBack;
 
                 MyOrderEvent?.Invoke(orders[i]);

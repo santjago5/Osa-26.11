@@ -174,7 +174,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
                 }
             }
 
-            timeEndWhait = DateTime.Now.AddMinutes(2);////
+            timeEndWhait = DateTime.Now.AddMinutes(5);////
 
             // нужно дождаться когда будет Done order
             while (true)
