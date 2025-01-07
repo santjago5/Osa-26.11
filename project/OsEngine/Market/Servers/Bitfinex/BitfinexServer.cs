@@ -2261,12 +2261,14 @@ namespace OsEngine.Market.Servers.Bitfinex
                 
                 updateOrder.Price = (orderDataList[16]).ToString().ToDecimal(); // PRICE
                 updateOrder.ServerType = ServerType.Bitfinex;
-                updateOrder.VolumeExecute = (orderDataList[7]).ToString().ToDecimal(); // AMOUNT_ORIG
+                updateOrder.VolumeExecute = (orderDataList[7]).ToString().ToDecimal(); // AMOUNT
+                updateOrder.Volume= (orderDataList[7]).ToString().ToDecimal();
                 updateOrder.PortfolioNumber = "BitfinexPortfolio";
 
 
                 SendLogMessage($"Order updated: {updateOrder.NumberMarket}, Status: {updateOrder.State}", LogMessageType.Trade);
-                SendLogMessage($"UpdateOrder message: {message}", LogMessageType.Trade);
+
+                SendLogMessage($"UpdateOrder message: {message} volume {updateOrder.Volume}, volumeExecute {updateOrder.VolumeExecute}", LogMessageType.Trade);
                 SendLogMessage($"Parsed order state: {updateOrder.State}", LogMessageType.Trade);
 
                 if (updateOrder.State == OrderStateType.Done || updateOrder.State == OrderStateType.Partial)
@@ -2453,7 +2455,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newOsOrder.Price = (orders[16]).ToString().ToDecimal();
                         newOsOrder.PortfolioNumber = "BitfinexPortfolio";
 
-                        if(newOsOrder.Side== Side.Buy)
+                        if(newOsOrder.Side== Side.Sell)
                         {
                             newOsOrder.Volume = -(orders[7]).ToString().ToDecimal();
                         }
@@ -2462,7 +2464,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                             newOsOrder.Volume = (orders[7]).ToString().ToDecimal();
                         }
                         SendLogMessage($"Order number {newOsOrder.NumberMarket} on exchange.", LogMessageType.Trade);
-
 
 
                         if (MyOrderEvent != null)
@@ -2585,7 +2586,9 @@ namespace OsEngine.Market.Servers.Bitfinex
                     List<object> responseJson = JsonConvert.DeserializeObject<List<object>>(responseBody);
 
                     SendLogMessage($"Order canceled Successfully. Order ID:{order.NumberMarket}", LogMessageType.Trade);
+
                     order.State = OrderStateType.Cancel;
+
                     MyOrderEvent(order);
 
                     GetPortfolios();

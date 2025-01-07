@@ -168,7 +168,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
             Server.ExecuteOrder(newOrder);
 
-            DateTime timeEndWhait = DateTime.Now.AddMinutes(2);
+            DateTime timeEndWhait = DateTime.Now.AddMinutes(2);///////////////
 
             Order order = null;
 
