@@ -469,8 +469,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                     Portfolio portfolio = new Portfolio();
 
                     portfolio.Number = "BitfinexPortfolio";
-                    portfolio.ValueBegin = wallets[0][2].ToString().ToDecimal();
-                    portfolio.ValueCurrent = wallets[0][4].ToString().ToDecimal();
+                    portfolio.ValueBegin = 1; //wallets[0][2].ToString().ToDecimal();
+                    portfolio.ValueCurrent = 1;// wallets[0][4].ToString().ToDecimal();
 
 
                     for (int i = 0; i < wallets.Count; i++)
@@ -2103,8 +2103,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     if (message.Contains("[0,\"ou\",[") || (message.Contains("[0,\"oc\",[")))
                     {
                         UpdateOrder(message);
-                        //  UpdateOrder(newOsOrder.NumberMarket, newOsOrder.NumberUser);
-
+                        
                     }
                     if (message.Contains("[0,\"os\",["))
                     {
@@ -2230,12 +2229,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                     return;
                 }
 
-                // Извлекаем третий элемент как JArray
-                var orderArray = (JArray)rootArray[2];
+                var orderDataList = JsonConvert.DeserializeObject<List<object>>(rootArray[2].ToString());
+              
 
                 // Преобразуем JArray в список ордеров
-                List<object> orderDataList = orderArray.ToObject<List<object>>();
-                //var orderData = ((JArray)rootArray[2]).ToObject<List<object>>();
+                //   List<object> orderDataList = orderArray.ToObject<List<object>>();
+
 
                 if (orderDataList == null)
                 {
@@ -2620,6 +2619,8 @@ namespace OsEngine.Market.Servers.Bitfinex
             rateGateChangePriceOrder.WaitToProceed();
 
             string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
+            string price = newPrice.ToString().Replace(',', '.');
+
             try
             {
                 if (order.TypeOrder == OrderPriceType.Market)
@@ -2630,7 +2631,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 string _apiPath = "v2/auth/w/order/update";
                 
-                string body = $"{{\"id\":{order.NumberMarket},\"price\":\"{newPrice}\"}}";
+                string body = $"{{\"id\":{order.NumberMarket},\"price\":\"{price}\"}}";
 
                 string signature = $"/api/{_apiPath}{nonce}{body}";
                 var client = new RestClient(_baseUrl);
@@ -2662,8 +2663,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                     string responseBody = response.Content;
                     var responseArray = JsonConvert.DeserializeObject<List<object>>(responseBody);
                     var orderDataArray = JsonConvert.DeserializeObject<List<object>>(responseArray[4].ToString());
+                    order.Price = orderDataArray[16].ToString().ToDecimal();
+                    order.State= GetOrderState(orderDataArray[13].ToString());
 
-                    SendLogMessage("Order change price. New price: " + newPrice
+                    SendLogMessage("Order change price. New price: " + order.Price
                       + "  " + order.SecurityNameCode, LogMessageType.Trade);//LogMessageType.System
 
                 }
