@@ -2615,14 +2615,13 @@ namespace OsEngine.Market.Servers.Bitfinex
         private RateGate rateGateChangePriceOrder = new RateGate(90, TimeSpan.FromMinutes(1));
 
 
-        public void ChangeOrderPrice(Order order, decimal newPrice/*, string amount*/)// еще можно менять объем
+        public void ChangeOrderPrice(Order order, decimal newPrice)
         {
-
             rateGateChangePriceOrder.WaitToProceed();
+
             string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
             try
             {
-                // Проверка типа ордера
                 if (order.TypeOrder == OrderPriceType.Market)
                 {
                     SendLogMessage("Can't change price for  Order Market", LogMessageType.Error);
@@ -2630,9 +2629,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
 
                 string _apiPath = "v2/auth/w/order/update";
-                string price = newPrice.ToString();///
-
-                string body = $"{{\"id\":{order.NumberMarket},\"price\":{price}}}";
+                
+                string body = $"{{\"id\":{order.NumberMarket},\"price\":\"{newPrice}\"}}";
 
                 string signature = $"/api/{_apiPath}{nonce}{body}";
                 var client = new RestClient(_baseUrl);
@@ -2647,29 +2645,26 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 IRestResponse response = client.Execute(request);
 
-                int qty = Convert.ToInt32(order.Volume - order.VolumeExecute);
+               // decimal qty = (order.Volume - order.VolumeExecute);
 
-                if (qty <= 0 || order.State != OrderStateType.Active)
-                {
-                    SendLogMessage("Can't change price for the order. It is not in Active state", LogMessageType.Error);
-                    return;
-                }
+                //if (qty <= 0 || order.State != OrderStateType.Active)
+                //{
+                //    SendLogMessage("Can't change price for the order. It is not in Active state", LogMessageType.Error);
+                //    return;
+                //}
                 if (order.State == OrderStateType.Cancel)//если ордер активный можно снять
                 {
                     return;
                 }
 
                 if (response.StatusCode == HttpStatusCode.OK)
-                {  // Выводим тело ответа
+                {  
                     string responseBody = response.Content;
+                    var responseArray = JsonConvert.DeserializeObject<List<object>>(responseBody);
+                    var orderDataArray = JsonConvert.DeserializeObject<List<object>>(responseArray[4].ToString());
 
-                    // string newPrice = responseBody;
-                    // ПЕРЕДЕЛАТЬ!!!!!!!!!
-                    // order.Price = newPrice.ToDecimal();/////////////////
-
-
-                    //SendLogMessage("Order change price. New price: " + newPrice
-                    //  + "  " + order.SecurityNameCode, LogMessageType.Trade);//LogMessageType.System
+                    SendLogMessage("Order change price. New price: " + newPrice
+                      + "  " + order.SecurityNameCode, LogMessageType.Trade);//LogMessageType.System
 
                 }
                 else
@@ -2677,13 +2672,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                     SendLogMessage("Change price order Fail. Status: "
                                 + response.Content + "  " + order.SecurityNameCode, LogMessageType.Error);
 
-                    if (response.Content != null)
-                    {
-                        SendLogMessage("Fail reasons: "
-                      + response.Content, LogMessageType.Error);
-                    }
                 }
-                // Вызов события изменения ордера
+              
                 MyOrderEvent?.Invoke(order);
             }
             catch (Exception exception)
