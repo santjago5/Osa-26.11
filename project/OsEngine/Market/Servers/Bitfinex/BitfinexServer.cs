@@ -2095,12 +2095,13 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                     }
 
-                    if (message.Contains("[0,\"tu\",["))
+                    else if (message.Contains("[0,\"tu\",["))
                     {
                         UpdateMyTrade(message);
                     }
 
-                    if (message.Contains("[0,\"ou\",[") || (message.Contains("[0,\"oc\",[")))
+                    else if 
+                       (message.StartsWith("[0,\"oc\",[") || message.StartsWith("[0,\"ou\",["))
                     {
                         UpdateOrder(message);
                         
@@ -2221,7 +2222,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             try
             {
-                // Десериализуем основной массив из JSON
                 List<object> rootArray = JsonConvert.DeserializeObject<List<object>>(message);
 
                 if (rootArray == null)
@@ -2231,11 +2231,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 var orderDataList = JsonConvert.DeserializeObject<List<object>>(rootArray[2].ToString());
               
-
-                // Преобразуем JArray в список ордеров
-                //   List<object> orderDataList = orderArray.ToObject<List<object>>();
-
-
                 if (orderDataList == null)
                 {
                     return;
@@ -2282,13 +2277,16 @@ namespace OsEngine.Market.Servers.Bitfinex
                 if (updateOrder.State == OrderStateType.Active)
                 {
                     Order orderFromHistory = GetOrderHistoryById(updateOrder.NumberMarket);
+                    //if (orderFromHistory == "0")
+                    //{
+
+                    //}
                     if (orderFromHistory != null && orderFromHistory.State != OrderStateType.Active)
                     {
                         updateOrder = orderFromHistory; // Обновляем данные ордера из истории
                         SendLogMessage($"Order updated from history: {orderFromHistory.NumberMarket}, Status: {orderFromHistory.State}", LogMessageType.Trade);
                     }
                 }
-
 
                 if (updateOrder.State == OrderStateType.Cancel)
                 {
@@ -2465,10 +2463,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                         SendLogMessage($"Order number {newOsOrder.NumberMarket} on exchange.", LogMessageType.Trade);
 
 
-                        if (MyOrderEvent != null)
-                        {
-                            MyOrderEvent(newOsOrder);
-                        }
+                        //if (MyOrderEvent != null)
+                        //{
+                        //    MyOrderEvent(newOsOrder);
+                        //}
 
                         GetPortfolios();
                     }
