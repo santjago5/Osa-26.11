@@ -34,6 +34,7 @@ using WebSocketState = WebSocket4Net.WebSocketState;
 using Timer = System.Timers.Timer;
 using WebSocketSharp;
 using OsEngine.Charts.CandleChart.Indicators;
+using System.Windows.Controls;
 
 
 
@@ -2255,10 +2256,18 @@ namespace OsEngine.Market.Servers.Bitfinex
                 updateOrder.NumberMarket = (orderDataList[0]).ToString(); // ID
                 updateOrder.Side = (orderDataList[7]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell; // SIDE  должен быть buy
                 updateOrder.State = GetOrderState((orderDataList[13]).ToString()); // STATUS//Done
-                updateOrder.TypeOrder = Convert.ToString(orderDataList[8]).Equals("EXCHANGE MARKET", StringComparison.OrdinalIgnoreCase)
-                    ? OrderPriceType.Market
-                    : OrderPriceType.Limit; // ORDER_TYPE
-                
+
+                string typeOrder = (orderDataList[8]).ToString();
+
+                if (typeOrder == "EXCHANGE LIMIT")
+                {
+                    updateOrder.TypeOrder = OrderPriceType.Limit;
+                }
+                else
+                {
+                    updateOrder.TypeOrder = OrderPriceType.Market;
+                }
+              
                 updateOrder.Price = (orderDataList[16]).ToString().ToDecimal(); // PRICE
                 updateOrder.ServerType = ServerType.Bitfinex;
                 decimal volume=(orderDataList[7]).ToString().ToDecimal();
@@ -2457,7 +2466,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newOsOrder.NumberMarket = orders[0].ToString();//190240109337
                         newOsOrder.NumberUser = Convert.ToInt32(orders[2]);
                         newOsOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orders[4]));
-                        newOsOrder.State = GetOrderState(orders[13].ToString());
+                        //newOsOrder.State = GetOrderState(orders[13].ToString());
+                        newOsOrder.State = OrderStateType.Active;
                         newOsOrder.SecurityClassCode = orders[3].ToString().StartsWith("f") ? "Futures" : "CurrencyPair";
                         newOsOrder.Side = (orders[6]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell;                    
                         newOsOrder.ServerType = ServerType.Bitfinex;
@@ -2472,6 +2482,15 @@ namespace OsEngine.Market.Servers.Bitfinex
                         
                         SendLogMessage($"Order number {newOsOrder.NumberMarket} on exchange.", LogMessageType.Trade);
 
+                        string typeOrder = (orders[8]).ToString();
+                        if(typeOrder == "EXCHANGE LIMIT" )
+                        {
+                            newOsOrder.TypeOrder = OrderPriceType.Limit;
+                        }
+                        else
+                        {
+                            newOsOrder.TypeOrder = OrderPriceType.Market;
+                        }
 
                         if (MyOrderEvent != null)
                         {
@@ -2672,7 +2691,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     var responseArray = JsonConvert.DeserializeObject<List<object>>(responseBody);
                     var orderDataArray = JsonConvert.DeserializeObject<List<object>>(responseArray[4].ToString());
                     order.Price = orderDataArray[16].ToString().ToDecimal();
-                    order.State= GetOrderState(orderDataArray[13].ToString());
+                    order.State= GetOrderState(orderDataArray[13].ToString()); // раскоментировать
 
                     SendLogMessage("Order change price. New price: " + order.Price
                       + "  " + order.SecurityNameCode, LogMessageType.Trade);//LogMessageType.System
@@ -2685,7 +2704,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 }
               
-                MyOrderEvent?.Invoke(order);
+            
             }
             catch (Exception exception)
             {
@@ -3193,7 +3212,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         {
                             volume=Math.Abs(volume);    
                         }
-                        decimal preVolume = volume + Math.Abs(Convert.ToDecimal(tradeData[9]));
+                        decimal preVolume = volume + Math.Abs(Convert.ToDecimal(tradeData[9]));// посмотреть как считается комиссия
                         // Расчет объема с учетом комиссии
                         //decimal preVolume = myTrade.Side == Side.Sell//22.044
                         //    ? Convert.ToDecimal(tradeData[4])
