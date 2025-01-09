@@ -33,6 +33,7 @@ using WebSocket = WebSocket4Net.WebSocket;
 using WebSocketState = WebSocket4Net.WebSocketState;
 using Timer = System.Timers.Timer;
 using WebSocketSharp;
+using OsEngine.Charts.CandleChart.Indicators;
 
 
 
@@ -2267,7 +2268,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
 
                 updateOrder.VolumeExecute = volume;// AMOUNT
-                updateOrder.Volume= (orderDataList[7]).ToString().ToDecimal();
+                updateOrder.Volume= volume;
                 updateOrder.PortfolioNumber = "BitfinexPortfolio";
 
 
@@ -2462,15 +2463,13 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newOsOrder.ServerType = ServerType.Bitfinex;
                         newOsOrder.Price = (orders[16]).ToString().ToDecimal();
                         newOsOrder.PortfolioNumber = "BitfinexPortfolio";
-
-                        if(newOsOrder.Side== Side.Sell)
+                        decimal volume=(orders[7]).ToString().ToDecimal();
+                        if(volume<0)
                         {
-                            newOsOrder.Volume = -(orders[7]).ToString().ToDecimal();
+                            volume = Math.Abs(volume);
                         }
-                        else
-                        {
-                            newOsOrder.Volume = (orders[7]).ToString().ToDecimal();
-                        }
+                         newOsOrder.Volume = volume;
+                        
                         SendLogMessage($"Order number {newOsOrder.NumberMarket} on exchange.", LogMessageType.Trade);
 
 
@@ -2764,7 +2763,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                         activOrder.NumberMarket = orderData[0].ToString();
                         activOrder.Side = (orderData[7]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell; // SIDE     orderData[6].Equals("-") ? Side.Sell : Side.Buy;
                         activOrder.State = GetOrderState(orderData[13].ToString());
-                        activOrder.Volume = orderData[7].ToString().ToDecimal();/////
+                        decimal volume=orderData[7].ToString().ToDecimal();
+                        if(volume<0)
+                        { 
+                            volume=Math.Abs(volume);
+                        }
+                        activOrder.Volume = volume; /////
                         activOrder.Price = orderData[16].ToString().ToDecimal();
                         activOrder.PortfolioNumber = "BitfinexPortfolio";
 
@@ -3011,11 +3015,17 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newOrder.SecurityNameCode = orderData[3].ToString();
                         newOrder.Side = (orderData[7]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell;
                         newOrder.State = GetOrderState(orderData[13].ToString());
-                        newOrder.Volume = orderData[7].ToString().ToDecimal();
+                        decimal volume=orderData[7].ToString().ToDecimal();
+
+                        if (volume < 0)
+                        {
+                            volume=Math.Abs(volume);
+                        }
+                            newOrder.Volume = volume;
                         newOrder.NumberUser = Convert.ToInt32(orderData[2]);
                         newOrder.Price = orderData[16].ToString().ToDecimal();
                         newOrder.PortfolioNumber = "BitfinexPortfolio";
-                        newOrder.VolumeExecute = orderData[7].ToString().ToDecimal();
+                        newOrder.VolumeExecute = volume;
 
 
                         if (newOrder.State == OrderStateType.Done ||
@@ -3100,15 +3110,13 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         //                if (volume < 0)
         //                {
-        //                    myOrder.Volume = -(volume);
+        //                    volume = Math.Abs(volume);
         //                }
-        //                else
-        //                {
-        //                    myOrder.Volume = volume;
-        //                }
+        //                
         //                myOrder.Price = orderData[16].ToString().ToDecimal();
         //                myOrder.PortfolioNumber = "BitfinexPortfolio";
-        //                myOrder.VolumeExecute = orderData[7].ToString().ToDecimal();
+        //                myOrder.VolumeExecute = volume;
+                           //myOrder.Volume = volume;
 
 
         //                if (myOrder != null)
@@ -3180,8 +3188,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                         myTrade.NumberOrderParent = (tradeData[3]).ToString(); //ORDER_ID
                         myTrade.Price = Convert.ToDecimal(tradeData[5]); // ORDER_PRICE
                         myTrade.Side = (tradeData[4]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell; // EXEC_AMOUNT// 
-
-                        decimal preVolume = Convert.ToDecimal(tradeData[4]) + Math.Abs(Convert.ToDecimal(tradeData[9]));
+                        decimal volume = (tradeData[4]).ToString().ToDecimal();
+                        if(volume<0)
+                        {
+                            volume=Math.Abs(volume);    
+                        }
+                        decimal preVolume = volume + Math.Abs(Convert.ToDecimal(tradeData[9]));
                         // Расчет объема с учетом комиссии
                         //decimal preVolume = myTrade.Side == Side.Sell//22.044
                         //    ? Convert.ToDecimal(tradeData[4])
