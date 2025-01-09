@@ -2024,10 +2024,14 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 newTrade.SecurityNameCode = GetSymbolByKeyInTrades(channelId);
                 newTrade.Id = tradeData[0].ToString();
-                decimal tradeAmount = tradeData[2].ToString().ToDecimal();
                 newTrade.Price = tradeData[3].ToString().ToDecimal();
-                newTrade.Volume = tradeAmount;
-                newTrade.Side = tradeAmount > 0 ? Side.Buy : Side.Sell;
+                decimal volume = tradeData[2].ToString().ToDecimal();
+                if (volume < 0) 
+                { 
+                    volume = Math.Abs(volume);
+                }
+                newTrade.Volume = volume;
+                newTrade.Side = volume > 0 ? Side.Buy : Side.Sell;
                 newTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(tradeData[1]));
 
 
@@ -2067,10 +2071,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         continue;
                     }
 
-                    if (message.Contains("hb"))
-                    {
-                        return;
-                    }
+                    
                     if (message.Contains("\"event\":\"info\""))
                     {
                         SendLogMessage("WebSocket opened", LogMessageType.System);
@@ -2090,12 +2091,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                         }
                     }
 
-                    if (message.Contains("[0,\"ps\",["))
+                    if (message.StartsWith("[0,\"ps\",["))
                     {
 
                     }
 
-                    else if (message.Contains("[0,\"tu\",["))
+                    else if (message.StartsWith("[0,\"tu\",["))
                     {
                         UpdateMyTrade(message);
                     }
@@ -2106,11 +2107,11 @@ namespace OsEngine.Market.Servers.Bitfinex
                         UpdateOrder(message);
                         
                     }
-                    if (message.Contains("[0,\"os\",["))
+                    if (message.StartsWith("[0,\"os\",["))
                     {
                         // SnapshotPositions(message);
                     }
-                    //if (message.Contains("[0,\"wu\",["))
+                    //if (message.StartsWith("[0,\"wu\",["))
                     //{
 
                     //    UpdatePortfolio(message);
@@ -2165,10 +2166,14 @@ namespace OsEngine.Market.Servers.Bitfinex
                 myTrade.NumberOrderParent = (tradeData[3]).ToString(); //190751003339 CID  ЧТО ТУТ ДОЛЖНО БЫТЬ
                 myTrade.Price = Convert.ToDecimal(tradeData[7]); // ORDER_PRICE
                 myTrade.NumberTrade = (tradeData[0]).ToString(); // trade_ID
-                myTrade.Side = (tradeData[4]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell; // EXEC_AMOUNT
-
+                decimal volume = (tradeData[4]).ToString().ToDecimal();
+                myTrade.Side = volume > 0 ? Side.Buy : Side.Sell; // EXEC_AMOUNT
+                if (volume < 0)
+                {
+                    volume = Math.Abs(volume);
+                }
                 // Расчет объема с учетом комиссии
-                decimal preVolume = Convert.ToDecimal(tradeData[4]) + Math.Abs(Convert.ToDecimal(tradeData[9]));
+                decimal preVolume = volume + Math.Abs((tradeData[9]).ToString().ToDecimal());
 
                 //decimal preVolume = myTrade.Side == Side.Sell
                 //    ? Convert.ToDecimal(tradeData[4])
@@ -2255,7 +2260,13 @@ namespace OsEngine.Market.Servers.Bitfinex
                 
                 updateOrder.Price = (orderDataList[16]).ToString().ToDecimal(); // PRICE
                 updateOrder.ServerType = ServerType.Bitfinex;
-                updateOrder.VolumeExecute = (orderDataList[7]).ToString().ToDecimal(); // AMOUNT
+                decimal volume=(orderDataList[7]).ToString().ToDecimal();
+                if (volume < 0)
+                {
+                    volume = Math.Abs(volume);
+                }
+
+                updateOrder.VolumeExecute = volume;// AMOUNT
                 updateOrder.Volume= (orderDataList[7]).ToString().ToDecimal();
                 updateOrder.PortfolioNumber = "BitfinexPortfolio";
 
@@ -2463,10 +2474,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                         SendLogMessage($"Order number {newOsOrder.NumberMarket} on exchange.", LogMessageType.Trade);
 
 
-                        //if (MyOrderEvent != null)
-                        //{
-                        //    MyOrderEvent(newOsOrder);
-                        //}
+                        if (MyOrderEvent != null)
+                        {
+                            MyOrderEvent(newOsOrder);
+                        }
 
                         GetPortfolios();
                     }
