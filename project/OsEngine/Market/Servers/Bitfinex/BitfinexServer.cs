@@ -2765,7 +2765,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
 
 
-
                     for (int i = 0; i < listOrders.Count; i++)
                     {
                         Order activOrder = new Order();
@@ -3261,11 +3260,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             // https://api.bitfinex.com/v2/auth/r/orders
 
             List<Order> orders = GetAllActiveOrders();
-
-            if (orders == null)///////////////
-            {
-                return;
-            }
 
             for (int i = 0; i < orders.Count; i++)
             {
