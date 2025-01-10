@@ -2348,11 +2348,9 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 return OrderStateType.Cancel;
             }
-            else if (orderStateResponse.StartsWith("REJECTED"))
-            {
-                return OrderStateType.Fail;
-            }
-            return OrderStateType.None;
+
+            //return OrderStateType.None;
+           return OrderStateType.Fail;
         }
 
 
@@ -2503,9 +2501,9 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
                 else
                 {
+                    CreateOrderFail(order);
                     SendLogMessage($"Error Order exception {response.Content}", LogMessageType.Error);
 
-                    CreateOrderFail(order);
                 }
 
                 // PortfolioEvent?.Invoke(_portfolios);///////////////
@@ -2521,7 +2519,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         private void CreateOrderFail(Order order)
         {
             order.State = OrderStateType.Fail;
-            MyOrderEvent?.Invoke(order);
+            //MyOrderEvent?.Invoke(order);
         }
 
         private readonly RateGate rateGateCancelAllOrder = new RateGate(90, TimeSpan.FromMinutes(1));
@@ -2761,7 +2759,11 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                     // List<BitfinexOrderData> activeOrders = new List<BitfinexOrderData>();
 
-                    //  if (orders != null && orders.Count > 0)
+                      if (orders != null && orders.Count == 0)
+                    {
+                        SendLogMessage($" You do not have any active orders: {response.Content}", LogMessageType.Trade);
+                        return null;
+                    }
                     if (listOrders == null)
                     {
                         return null;
@@ -3040,7 +3042,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         {
                             volume=Math.Abs(volume);
                         }
-                            newOrder.Volume = volume;
+                        newOrder.Volume = volume;
                         newOrder.NumberUser = Convert.ToInt32(orderData[2]);
                         newOrder.Price = orderData[16].ToString().ToDecimal();
                         newOrder.PortfolioNumber = "BitfinexPortfolio";
