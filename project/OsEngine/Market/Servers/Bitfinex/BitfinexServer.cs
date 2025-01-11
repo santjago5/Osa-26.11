@@ -595,18 +595,34 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             List<Trade> lastTrades =
               BitfinexGetTrades(security.Name, limit, startTime, endTime);
-
+            // Если не получено никаких данных, возвращаем пустой список
+            if (lastTrades == null || lastTrades.Count == 0)
+            {
+                SendLogMessage("No trades found.", LogMessageType.Error);
+                return trades;
+            }
             trades.AddRange(lastTrades);
+            // Проверка на пустоту списка перед доступом
+            if (trades.Count == 0)
+            {
+                SendLogMessage("No trades found after adding last trades.", LogMessageType.Error);
+                return trades;
+            }
 
             DateTime curEnd = trades[0].Time;
 
             DateTime cu = trades[trades.Count - 1].Time;
 
-            while (curEnd <= startTime == false)
+            while (curEnd > startTime)
             {
                 List<Trade> newTrades = BitfinexGetTrades(security.Name, limit, startTime, endTime);
 
-                if (trades.Count != 0 && newTrades.Count != 0)
+                if (newTrades == null || newTrades.Count == 0)
+                {
+                    return trades;
+                }
+
+                if (trades.Count > 0 && newTrades.Count > 0)
                 {
                     if (newTrades[newTrades.Count - 1].Time >= trades[0].Time)
                     {
@@ -614,19 +630,9 @@ namespace OsEngine.Market.Servers.Bitfinex
                     }
                 }
 
-                if (newTrades.Count == 0)
-                {
-                    return trades;
-                }
-
                 trades.InsertRange(0, newTrades);
 
                 curEnd = trades[0].Time;
-            }
-
-            if (trades.Count == 0)
-            {
-                return null;
             }
 
             return trades;
