@@ -590,19 +590,18 @@ namespace OsEngine.Market.Servers.Bitfinex
         public List<Trade> GetTickDataToSecurity(Security security, DateTime startTime, DateTime endTime, DateTime actualTime)
         {
             List<Trade> trades = new List<Trade>();
-            //int limit = 10000;
-            int limit = 100;
+            int limit = 10000;
+            //int limit = 100;
 
-            List<Trade> lastTrades =
-              BitfinexGetTrades(security.Name, limit, startTime, endTime);
-            // Если не получено никаких данных, возвращаем пустой список
+            List<Trade> lastTrades =  BitfinexGetTrades(security.Name, limit, startTime, endTime);
+       
             if (lastTrades == null || lastTrades.Count == 0)
             {
                 SendLogMessage("No trades found.", LogMessageType.Error);
                 return trades;
             }
             trades.AddRange(lastTrades);
-            // Проверка на пустоту списка перед доступом
+            
             if (trades.Count == 0)
             {
                 SendLogMessage("No trades found after adding last trades.", LogMessageType.Error);
@@ -642,7 +641,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             try
             {
-                Thread.Sleep(8000);
+                Thread.Sleep(6000);
 
                 _rateGateTrades.WaitToProceed();
 
@@ -2303,7 +2302,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 // Если ордер не выполнен, проверяем его через GetOrderHistoryById
                 if (updateOrder.State == OrderStateType.Active)
                 {
-                    Order orderFromHistory = GetOrderHistoryById(updateOrder.NumberMarket);
+                    Order orderFromHistory = GetOrderHistoryById(updateOrder.NumberMarket,updateOrder.NumberUser);
                     //if (orderFromHistory == "0")
                     //{
 
@@ -2355,8 +2354,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return OrderStateType.Cancel;
             }
 
-            //return OrderStateType.None;
-            return OrderStateType.Fail;
+            return OrderStateType.None;
+           // return OrderStateType.Fail;
         }
 
 
@@ -2501,7 +2500,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                             MyOrderEvent(newOsOrder);
                         }
 
-                        GetPortfolios();
+                       // GetPortfolios();
                     }
 
                 }
@@ -2525,7 +2524,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         private void CreateOrderFail(Order order)
         {
             order.State = OrderStateType.Fail;
-            //MyOrderEvent?.Invoke(order);
+            MyOrderEvent?.Invoke(order);
         }
 
         private readonly RateGate rateGateCancelAllOrder = new RateGate(90, TimeSpan.FromMinutes(1));
@@ -2795,6 +2794,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                         activOrder.Price = orderData[16].ToString().ToDecimal();
                         activOrder.PortfolioNumber = "BitfinexPortfolio";
 
+                        orders.Add(activOrder);
+
                         //activOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(activeOrders.MtsUpdate));
                         //activOrder.TimeCreate = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(activeOrders[i].MtsCreate));
                         //activOrder.ServerType = ServerType.Bitfinex;
@@ -2808,7 +2809,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                         //activOrder.VolumeExecute = activeOrders[i].AmountOrig.ToDecimal();
                         //activOrder.PortfolioNumber = "BitfinexPortfolio";
 
-                        orders.Add(activOrder);
 
                         //MyOrderEvent?.Invoke(orders[i]);
                     }
@@ -2831,8 +2831,8 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             // Получаем ордер с биржи по рыночному номеру ордера
 
-            Order orderFromHistory = GetOrderHistoryById(order.NumberMarket);
-            Order orderFromActive = GetActiveOrder(order.NumberMarket);
+            Order orderFromHistory = GetOrderHistoryById(order.NumberMarket,order.NumberUser);
+            Order orderFromActive = GetActiveOrder(order.NumberMarket,order.NumberUser);
 
             // Объявляем переменную для хранения ордера на рынке
             Order orderOnMarket = null;
@@ -2894,8 +2894,12 @@ namespace OsEngine.Market.Servers.Bitfinex
             MyOrderEvent?.Invoke(orderOnMarket);
         }
 
-        private Order GetActiveOrder(string id)
+        private Order GetActiveOrder(string id,int cid)
         {
+            if(id =="")
+            {
+                return null;
+            }
             long orderId = Convert.ToInt64(id);
 
             // post https://api.bitfinex.com/v2/auth/r/orders
@@ -2905,7 +2909,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             List<Order> orders = new List<Order>();
 
             string body = $"{{\"id\":[{orderId}]}}";
-            // string body = $"{{\"cid\":\"{id}\"}}";
+            // string body = $"{{\"cid\":\"{cid}\"}}";
             string _apiPath = "v2/auth/r/orders";
 
 
@@ -2987,13 +2991,17 @@ namespace OsEngine.Market.Servers.Bitfinex
 
 
         //получение статуса завершенного ордера
-        private Order GetOrderHistoryById(string orderId)//нет ордер id
+        private Order GetOrderHistoryById(string orderId,int cid)//нет ордер id
         {
             // https://api.bitfinex.com/v2/auth/r/orders/hist
             string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
             string _apiPath = "v2/auth/r/orders/hist";
 
             // long orderId = 190717081154;
+            if (orderId == "")
+            {
+                return null;
+            }
 
             string body = $"{{\"id\":[{orderId}]}}";
 
@@ -3010,6 +3018,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             request.AddParameter("application/json", body, ParameterType.RequestBody);
 
             IRestResponse response = client.Execute(request);
+
             Order newOrder = new Order();
 
             try

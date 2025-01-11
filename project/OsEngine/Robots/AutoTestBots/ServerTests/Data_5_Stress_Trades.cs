@@ -141,7 +141,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
             if (permission.DataFeedTfTickCanLoad)
             {
-                DateTime startTime = lastMidnightTime.AddDays(-10);
+                DateTime startTime = lastMidnightTime.AddDays(-2);
                 DateTime endTime = lastMidnightTime.AddDays(-1).AddHours(-1);
 
                 SetNewServiceInfo("Start time trades: " + startTime.ToString());
