@@ -2844,7 +2844,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             // Получаем историю ордеров
             List<Order> ordersHistory = GetHistoryOrders();
-
+            List<Order> ordersactive = GetAllActiveOrders();
             // Переменная для хранения ордера с рынка
             Order orderOnMarket = null;
 
