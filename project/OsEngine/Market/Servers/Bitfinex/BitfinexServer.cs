@@ -426,11 +426,11 @@ namespace OsEngine.Market.Servers.Bitfinex
         /// </summary>
         #region 4 Portfolios
 
-        private readonly List<Portfolio> _portfolios = new List<Portfolio>();
+        private List<Portfolio> _portfolios = new List<Portfolio>();
 
         public event Action<List<Portfolio>> PortfolioEvent;
 
-        private readonly RateGate _rateGatePortfolio = new RateGate(90, TimeSpan.FromMinutes(1));
+        private RateGate _rateGatePortfolio = new RateGate(90, TimeSpan.FromMinutes(1));
 
 
         public void GetPortfolios()
@@ -466,7 +466,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                 IRestResponse response = client.Execute(request);
 
                 if (response.StatusCode == HttpStatusCode.OK)
-                {
+                {//[["exchange","TRX",87.687002,0,87.687002,"Trading fees for 22.0 TRX (TRXUSD) @ 0.2467 on BFX (0.2%)",null],
+                 //["exchange","USD",1.67033127,0,1.67033127,"Exchange 22.0 TRX for USD @ 0.24674",{"reason":"TRADE","order_id":192699206296,"order_id_oppo":192699836818,"trade_price":"0.24674","trade_amount":"22.0","order_cid":1469,"order_gid":null}],
+                 //["exchange","FLR",9.8e-7,0,9.8e-7,"Exchange 868.608238 FLR for USD @ 0.013422",{"reason":"TRADE","order_id":179411603688,"order_id_oppo":179878103613,"trade_price":"0.013422","trade_amount":"-868.608238","order_cid":1730546344388,"order_gid":null}]]
+
                     List<List<object>> wallets = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
 
                     Portfolio portfolio = new Portfolio();
@@ -486,10 +489,10 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                             position.PortfolioName = "BitfinexPortfolio";
                             position.SecurityNameCode = wallet[1].ToString();
-                            position.ValueBegin = wallet[2].ToString().ToDecimal();
-                            position.ValueCurrent = wallet[4].ToString().ToDecimal();
-                            position.ValueBlocked = wallet[2].ToString().ToDecimal() - wallet[4].ToString().ToDecimal();
-                          
+                            //position.ValueBegin = wallet[2].ToString().ToDecimal();
+                            position.ValueCurrent = wallet[2].ToString().ToDecimal();
+                            position.ValueBlocked = 0;// wallet[2].ToString().ToDecimal() - wallet[4].ToString().ToDecimal();
+
                             portfolio.SetNewPosition(position);
                         }
                     }
@@ -511,72 +514,49 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        private void CreateQueryPosition()
-        {
-            _rateGatePositions.WaitToProceed();
 
+
+        private void UpdatePortfolio(string json)///////ИСПРАВИТЬ
+        {//[0,"wu",["exchange","TRX",87.687002,0,43.68700200000001,"Trading fees for 22.0 TRX (TRXUSD) @ 0.2467 on BFX (0.2%)",null]]
+      
             try
             {
-                string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-                string _apiPath = "v2/auth/r/orders";
-                string signature = $"/api/{_apiPath}{nonce}";
-                string sig = ComputeHmacSha384(_secretKey, signature);
-                RestClient client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);
-                request.AddHeader("accept", "application/json");
-                request.AddHeader("bfx-nonce", nonce);
-                request.AddHeader("bfx-apikey", _publicKey);
-                request.AddHeader("bfx-signature", sig);
+                List<object> walletArray = JsonConvert.DeserializeObject<List<object>>(json);
+                List<object> wallet = JsonConvert.DeserializeObject<List<object>>(walletArray[2].ToString());
 
-                IRestResponse response = client.Execute(request);
-
-                if (response.StatusCode == HttpStatusCode.OK)
+                if (walletArray == null)
                 {
-                    string responseBody = response.Content;
+                    return;
+                }
+                Portfolio portfolio = new Portfolio();
 
-                    UpdatePortfolio(responseBody); // Обновляем позиции  приходит пустой массив, если нет позиций
+                portfolio.Number = "BitfinexPortfolio";
+                portfolio.ValueBegin = 1;
+                portfolio.ValueCurrent = 1;
+
+                    if (wallet[0].ToString() == "exchange")
+                    {
+                        PositionOnBoard position = new PositionOnBoard();
+
+                        position.PortfolioName = "BitfinexPortfolio";
+                        position.SecurityNameCode = wallet[1].ToString();
+                        //position.ValueBegin = wallet[2].ToString().ToDecimal();
+                        position.ValueCurrent = wallet[2].ToString().ToDecimal();
+                        position.ValueBlocked = 0;// wallet[2].ToString().ToDecimal() - wallet[4].ToString().ToDecimal();
+
+                        portfolio.SetNewPosition(position);
+                   
                 }
-                else
-                {
-                    SendLogMessage($"Create Query Position: {response.Content}", LogMessageType.Error);
-                }
+
+                PortfolioEvent(new List<Portfolio> { portfolio });
             }
+
             catch (Exception exception)
             {
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
-
         }
 
-        private void UpdatePortfolio(string json)
-        {
-
-            List<List<object>> response = JsonConvert.DeserializeObject<List<List<object>>>(json);
-
-            Portfolio portfolio = new Portfolio();
-
-            portfolio.Number = "BitfinexPortfolio";
-            portfolio.ValueBegin = 1;
-            portfolio.ValueCurrent = 1;
-
-
-            for (int i = 0; i < response.Count; i++)
-            {
-                List<object> position = response[i];
-
-                PositionOnBoard pos = new PositionOnBoard();
-
-                pos.PortfolioName = "BitfinexPortfolio";
-                pos.SecurityNameCode = position[3].ToString();
-                pos.ValueBegin = position[7].ToString().ToDecimal();
-                pos.ValueBlocked = position[7].ToString().ToDecimal() - position[6].ToString().ToDecimal();
-                pos.ValueCurrent = position[6].ToString().ToDecimal();
-
-                portfolio.SetNewPosition(pos);
-            }
-
-            PortfolioEvent(new List<Portfolio> { portfolio });
-        }
 
 
         #endregion
@@ -2115,15 +2095,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                         UpdateOrder(message);
 
                     }
-                    if (message.StartsWith("[0,\"os\",["))
-                    {
-                        // SnapshotPositions(message);
-                    }
-                    //if (message.StartsWith("[0,\"wu\",["))
-                    //{
 
-                    //    UpdatePortfolio(message);
-                    //}
+                    if (message.StartsWith("[0,\"wu\",["))
+                    {
+
+                        UpdatePortfolio(message);
+                    }
 
                     //if (message.Contains("ws"))
                     //{
@@ -2297,7 +2274,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     updateOrder.TimeDone = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderDataList[5])); // MTS_UPDATE  
                     updateOrder.State = OrderStateType.Done;
 
-                   List<MyTrade> myTrades= GetMyTradesBySecurity(updateOrder.SecurityNameCode, updateOrder.NumberMarket);
+                    List<MyTrade> myTrades = GetMyTradesBySecurity(updateOrder.SecurityNameCode, updateOrder.NumberMarket);
 
                 }
 
@@ -2480,10 +2457,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newOsOrder.Price = (orders[16]).ToString().ToDecimal();
                         newOsOrder.PortfolioNumber = "BitfinexPortfolio";
                         decimal volume = (orders[7]).ToString().ToDecimal();
-                        if (volume < 0)
-                        {
-                            volume = Math.Abs(volume);
-                        }
+                        //if (volume < 0)
+                        //{
+                        //    volume = Math.Abs(volume);
+                        //}
                         newOsOrder.Volume = volume;
 
                         SendLogMessage($"Order number {newOsOrder.NumberMarket} on exchange.", LogMessageType.Trade);
@@ -2503,9 +2480,9 @@ namespace OsEngine.Market.Servers.Bitfinex
                             MyOrderEvent(newOsOrder);
                         }
 
-                        // GetPortfolios();
+                        //GetPortfolios();
                     }
-
+                    //PortfolioEvent?.Invoke(_portfolios);
                 }
                 else
                 {
@@ -2514,7 +2491,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 }
 
-                PortfolioEvent?.Invoke(_portfolios);///////////////
+
             }
             catch (Exception exception)
             {
@@ -2878,7 +2855,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage($"Failed to find order with number.", LogMessageType.Error);
                 return;
             }
-            
+
             //historyOrder.NumberUser = order.NumberUser;
 
             //////////////////////////////////////////////
@@ -3194,10 +3171,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                                 myOrder.PortfolioNumber = "BitfinexPortfolio";
                                 myOrder.VolumeExecute = volume;
                                 myOrder.Volume = volume;
-                               
+
                                 //myOrder.NumberUser = Convert.ToInt32(orderData[2]);//ОШИБКА
                                 long numberUser = Convert.ToInt64(orderData[2]);
-                        
+
                                 if (!historyOrdersByCid.ContainsKey(numberUser))
                                 {
                                     historyOrdersByCid.Add(numberUser, myOrder);
@@ -3277,7 +3254,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         myTrade.Price = Convert.ToDecimal(tradeData[5]); // ORDER_PRICE
                         myTrade.Side = (tradeData[4]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell; // EXEC_AMOUNT// 
                         myTrade.NumberPosition = (tradeData[11]).ToString();
-                       
+
                         decimal volume = (tradeData[4]).ToString().ToDecimal();
                         if (volume < 0)
                         {
@@ -3350,6 +3327,43 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
+
+        private void CreateQueryPosition()
+        {
+            _rateGatePositions.WaitToProceed();
+
+            try
+            {
+                string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
+                string _apiPath = "v2/auth/r/orders";
+                string signature = $"/api/{_apiPath}{nonce}";
+                string sig = ComputeHmacSha384(_secretKey, signature);
+                RestClient client = new RestClient(_baseUrl);
+                var request = new RestRequest(_apiPath, Method.POST);
+                request.AddHeader("accept", "application/json");
+                request.AddHeader("bfx-nonce", nonce);
+                request.AddHeader("bfx-apikey", _publicKey);
+                request.AddHeader("bfx-signature", sig);
+
+                IRestResponse response = client.Execute(request);
+
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    string responseBody = response.Content;
+
+                    UpdatePortfolio(responseBody); // Обновляем позиции  приходит пустой массив, если нет позиций
+                }
+                else
+                {
+                    SendLogMessage($"Create Query Position: {response.Content}", LogMessageType.Error);
+                }
+            }
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
+
+        }
 
         #region 12 Log
 
