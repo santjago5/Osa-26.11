@@ -156,6 +156,7 @@ namespace OsEngine.Robots.AutoTestBots.ServerTests
 
             DateTime endWhaitTime = DateTime.Now.AddSeconds(15);
 
+
             while (true)
             {
                 if (endWhaitTime < DateTime.Now)

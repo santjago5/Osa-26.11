@@ -435,13 +435,12 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public void GetPortfolios()
         {
+            CreateQueryPortfolio();
+
             if (_portfolios.Count != 0)
             {
                 PortfolioEvent?.Invoke(_portfolios);
             }
-
-            CreateQueryPortfolio();
-
         }
 
         private void CreateQueryPortfolio()
@@ -470,14 +469,13 @@ namespace OsEngine.Market.Servers.Bitfinex
                  //["exchange","USD",1.67033127,0,1.67033127,"Exchange 22.0 TRX for USD @ 0.24674",{"reason":"TRADE","order_id":192699206296,"order_id_oppo":192699836818,"trade_price":"0.24674","trade_amount":"22.0","order_cid":1469,"order_gid":null}],
                  //["exchange","FLR",9.8e-7,0,9.8e-7,"Exchange 868.608238 FLR for USD @ 0.013422",{"reason":"TRADE","order_id":179411603688,"order_id_oppo":179878103613,"trade_price":"0.013422","trade_amount":"-868.608238","order_cid":1730546344388,"order_gid":null}]]
 
-                    List<List<object>> wallets = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
-
                     Portfolio portfolio = new Portfolio();
 
                     portfolio.Number = "BitfinexPortfolio";
-                    portfolio.ValueBegin = 1; //wallets[0][2].ToString().ToDecimal();
-                    portfolio.ValueCurrent = 1;// wallets[0][4].ToString().ToDecimal();
+                    portfolio.ValueBegin = 1; 
+                    portfolio.ValueCurrent = 1;
 
+                    List<List<object>> wallets = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
 
                     for (int i = 0; i < wallets.Count; i++)
                     {
@@ -489,16 +487,27 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                             position.PortfolioName = "BitfinexPortfolio";
                             position.SecurityNameCode = wallet[1].ToString();
-                            //position.ValueBegin = wallet[2].ToString().ToDecimal();
+                            position.ValueBegin = wallet[2].ToString().ToDecimal();
                             position.ValueCurrent = wallet[2].ToString().ToDecimal();
-                            position.ValueBlocked = 0;// wallet[2].ToString().ToDecimal() - wallet[4].ToString().ToDecimal();
+                            if (wallet[4] != null)
+                            {
+                                position.ValueBlocked = wallet[2].ToString().ToDecimal() - wallet[4].ToString().ToDecimal();
+                            }
+                            else
+                            {
+                                position.ValueBlocked = 0;
+                            }
 
                             portfolio.SetNewPosition(position);
                         }
                     }
+                  
+                    _portfolios.Add(portfolio);
 
-
-                    PortfolioEvent(new List<Portfolio> { portfolio });
+                    if (_portfolios.Count != 0)
+                    {
+                        PortfolioEvent?.Invoke(_portfolios);
+                    }
 
                 }
 
@@ -512,13 +521,12 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
+
         }
 
-
-
-        private void UpdatePortfolio(string json)///////ИСПРАВИТЬ
+        private void UpdatePortfolio(string json)
         {//[0,"wu",["exchange","TRX",87.687002,0,43.68700200000001,"Trading fees for 22.0 TRX (TRXUSD) @ 0.2467 on BFX (0.2%)",null]]
-      
+
             try
             {
                 List<object> walletArray = JsonConvert.DeserializeObject<List<object>>(json);
@@ -528,27 +536,40 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     return;
                 }
+
                 Portfolio portfolio = new Portfolio();
 
                 portfolio.Number = "BitfinexPortfolio";
                 portfolio.ValueBegin = 1;
                 portfolio.ValueCurrent = 1;
+                portfolio.ServerType = ServerType.Bitfinex;
+                if (wallet[0].ToString() == "exchange")
+                {
+                    PositionOnBoard position = new PositionOnBoard();
 
-                    if (wallet[0].ToString() == "exchange")
+                    position.PortfolioName = "BitfinexPortfolio";
+                    position.SecurityNameCode = wallet[1].ToString();
+                    position.ValueCurrent = wallet[2].ToString().ToDecimal();
+                    position.ValueBegin = wallet[2].ToString().ToDecimal();
+                    
+                    if (wallet[4] != null)
                     {
-                        PositionOnBoard position = new PositionOnBoard();
-
-                        position.PortfolioName = "BitfinexPortfolio";
-                        position.SecurityNameCode = wallet[1].ToString();
-                        //position.ValueBegin = wallet[2].ToString().ToDecimal();
-                        position.ValueCurrent = wallet[2].ToString().ToDecimal();
-                        position.ValueBlocked = 0;// wallet[2].ToString().ToDecimal() - wallet[4].ToString().ToDecimal();
-
-                        portfolio.SetNewPosition(position);
-                   
+                        position.ValueBlocked = wallet[2].ToString().ToDecimal() - wallet[4].ToString().ToDecimal();
+                    }
+                    else
+                    {
+                        position.ValueBlocked = 0;
+                    }
+                    portfolio.SetNewPosition(position);
                 }
+                portfolio.ServerType = ServerType.Bitfinex;
+             
+                _portfolios.Add(portfolio);
 
-                PortfolioEvent(new List<Portfolio> { portfolio });
+                if (_portfolios.Count > 0)
+                {
+                    PortfolioEvent?.Invoke(_portfolios);
+                }
             }
 
             catch (Exception exception)
@@ -557,7 +578,17 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
+        private void UpdateBalance(string json)
+        {
+            List<object> balanceArray = JsonConvert.DeserializeObject<List<object>>(json);
+            List<object> balance = JsonConvert.DeserializeObject<List<object>>(balanceArray[2].ToString());
+            Portfolio portfolio = new Portfolio();
 
+            portfolio.Number = "BitfinexPortfolio";
+            portfolio.ValueBegin = balance[0].ToString().ToDecimal();
+            portfolio.ValueCurrent = balance[1].ToString().ToDecimal();
+
+        }
 
         #endregion
 
@@ -2102,10 +2133,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                         UpdatePortfolio(message);
                     }
 
-                    //if (message.Contains("ws"))
-                    //{
-                    //    // UpdatePortfolio(message);
-                    //}
+                    if (message.StartsWith("[0,\"bu\",["))
+                    {
+                        UpdateBalance(message);
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -2113,6 +2144,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
             }
         }
+
+      
 
         private void UpdateMyTrade(string message)
         {
