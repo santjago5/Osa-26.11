@@ -52,13 +52,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             CreateParameterString(OsLocalization.Market.ServerParamPublicKey, "");
             CreateParameterPassword(OsLocalization.Market.ServerParamSecretKey, "");
         }
-
-        //public List<Candle> GetCandleHistory(string nameSec, TimeSpan tf)
-        //{
-        //    return ((BitfinexServer)ServerRealization).GetCandleHistory(nameSec, tf);
-        //}
     }
-
     public class BitfinexServerRealization : IServerRealization
     {
         #region 1 Constructor, Status, Connection
@@ -161,10 +155,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #endregion
 
-
-        /// <summary>
-        /// настройки коннектора
-        /// </summary>
         #region 2 Properties 
         public List<IServerParameter> ServerParameters { get; set; }
         public ServerConnectStatus ServerStatus { get; set; }
@@ -178,9 +168,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #endregion
 
-        /// <summary>
-        /// сделать рейд минутами в соответсвии с сайтом
-        /// </summary>
         #region 3 Securities
 
         private readonly RateGate _rateGateGetsecurity = new RateGate(30, TimeSpan.FromMinutes(1));
@@ -392,9 +379,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         #endregion
 
-        /// <summary>
-        /// Запрос доступных портфелей у подключения. 
-        /// </summary>
         #region 4 Portfolios
 
         private List<Portfolio> _portfolios = new List<Portfolio>();
@@ -558,9 +542,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #endregion
 
-        /// <summary>
-        /// Запросы данных по свечкам и трейдам. 
-        /// </summary>
         #region 5 Data Candles
 
         private readonly RateGate _rateGateCandleHistory = new RateGate(29, TimeSpan.FromMinutes(1));
@@ -1075,9 +1056,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #endregion
 
-        /// <summary>
-        /// Создание вебсокет соединения. 
-        /// </summary>
         #region  6 WebSocket creation
         // ConcurrentQueue<string>;
         private WebSocket _webSocketPublic;
@@ -1178,9 +1156,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #endregion
 
-        /// <summary>
-        /// Обработка входящих сообщений от вёбсокета. И что важно в данном конкретном случае, Closed и Opened методы обязательно должны находиться здесь,
-        /// </summary>
         #region  7 WebSocket events
 
         private bool _socketPublicIsActive;
@@ -1690,9 +1665,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         #endregion
 
-        /// <summary>
-        /// Подписка на бумагу.С обязательным контролем скорости и кол-ву запросов к методу Subscrible через rateGate.
-        /// </summary>
         #region  8 Security subscrible 
 
         private RateGate _rateGateSecurity = new RateGate(30, TimeSpan.FromMinutes(1));
@@ -2022,7 +1994,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        private readonly Dictionary<string, int> _decimalVolume = new Dictionary<string, int>();
+        private  Dictionary<string, int> _decimalVolume = new Dictionary<string, int>();
      
         private decimal GetVolumeForMyTrade(string symbol, decimal preVolume)
         {
@@ -2164,9 +2136,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #endregion
 
-        /// <summary>
-        /// посвящённый торговле. Выставление ордеров, отзыв и т.д
-        /// </summary>
         #region  10 Trade
 
         private RateGate _rateGateSendOrder = new RateGate(90, TimeSpan.FromMinutes(1));
@@ -2574,7 +2543,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             return orders;
         }
-        
         public void GetOrderStatus(Order order)
         {
             if (order == null || order.NumberUser == 0)
@@ -2713,7 +2681,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-
         private Order GetActiveOrder(string id)
         {
             if (id == "")
@@ -2799,9 +2766,23 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             return activOrder;
         }
+        public void GetAllActivOrders()
+        {
+            List<Order> orders = GetAllActiveOrders();
 
+            if (orders == null || orders.Count == 0)
+            {
+                SendLogMessage("No active orders found.", LogMessageType.Error);
+                return;
+            }
+            for (int i = 0; i < orders.Count; i++)
+            {
+                orders[i].TimeCallBack = orders[i].TimeCallBack;
+                orders[i].State = (orders[i].State);
 
-        //получение статуса завершенного ордера
+                MyOrderEvent?.Invoke(orders[i]);
+            }
+        }
         private Order GetOrderHistoryById(string orderId)//нет ордер id
         {
             // https://api.bitfinex.com/v2/auth/r/orders/hist
@@ -2900,7 +2881,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             return historyOrder;
 
         }
-
         public List<List<object>> GetHistoryOrders1()
         {
             // https://api.bitfinex.com/v2/auth/r/orders/hist
@@ -2931,8 +2911,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
             return null;
         }
-
-
         public List<Order> GetHistoryOrders()
         {
             string nonce = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
@@ -3030,7 +3008,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             return ordersHistory; 
         }
-
         private List<MyTrade> GetMyTradesBySecurity(string symbol, string orderId)
         {
             string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
@@ -3106,28 +3083,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
 
         #endregion
-        /// <summary>
-        /// Логирование.
-        /// </summary>
-
-
-        public void GetAllActivOrders()
-        {
-            List<Order> orders = GetAllActiveOrders();
-
-            if (orders == null || orders.Count == 0)
-            {
-                SendLogMessage("No active orders found.", LogMessageType.Error);
-                return;
-            }
-            for (int i = 0; i < orders.Count; i++)
-            {
-                orders[i].TimeCallBack = orders[i].TimeCallBack;
-                orders[i].State = (orders[i].State);
-
-                MyOrderEvent?.Invoke(orders[i]);
-            }
-        }
 
         #region 12 Log
 
@@ -3138,7 +3093,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
 
         #endregion
-
     }
 }
 
