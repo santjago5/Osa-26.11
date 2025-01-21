@@ -87,18 +87,17 @@ namespace OsEngine.Market.Servers.Bitfinex
                 _secretKey = ((ServerParameterPassword)ServerParameters[1]).Value;
 
                 if (string.IsNullOrEmpty(_publicKey) || string.IsNullOrEmpty(_secretKey))
-
                 {
                     SendLogMessage("Connection failed. Authorization exception", LogMessageType.Error);
                     ServerStatus = ServerConnectStatus.Disconnect;
                     DisconnectEvent();
                     return;
                 }
-                RestClient client = new RestClient(_baseUrl);
                 string _apiPath = "v2/platform/status";
-
+                RestClient client = new RestClient(_baseUrl);
                 RestRequest request = new RestRequest(_apiPath);
                 request.AddHeader("accept", "application/json");
+
                 IRestResponse response = client.Execute(request);
 
                 if (response.StatusCode == HttpStatusCode.OK)
@@ -113,7 +112,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
             catch (Exception exception)
             {
-                SendLogMessage("Connection cannot be open. Bitfinex. exception:" + exception.ToString(), LogMessageType.Error);
+                SendLogMessage("Connection cannot be open Bitfinex. exception:" + exception.ToString(), LogMessageType.Error);
                 ServerStatus = ServerConnectStatus.Disconnect;
                 DisconnectEvent();
             }
@@ -157,7 +156,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #region 3 Securities
 
-        private RateGate _rateGateGetsecurity = new RateGate(30, TimeSpan.FromMinutes(1));
+        private RateGate _rateGateSecurity = new RateGate(30, TimeSpan.FromMinutes(1));
         private RateGate _rateGatePositions = new RateGate(90, TimeSpan.FromMinutes(1));
         private RateGate _rateGateTrades = new RateGate(15, TimeSpan.FromMinutes(1));
         private List<Security> _securities = new List<Security>();
@@ -165,17 +164,19 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public void GetSecurities()
         {
-            _rateGateGetsecurity.WaitToProceed();
+            _rateGateSecurity.WaitToProceed();
 
             RequestMinSizes();
 
             try
             {
-                RestClient client = new RestClient(_baseUrl);
                 string _apiPath = "v2/tickers?symbols=ALL";
+                RestClient client = new RestClient(_baseUrl);
                 RestRequest request = new RestRequest(_apiPath);
                 request.AddHeader("accept", "application/json");
+
                 IRestResponse response = client.Execute(request);
+
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     string jsonResponse = response.Content;
@@ -226,7 +227,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newSecurity.DecimalsVolume = DigitsAfterComma(volume);                       //кол-во знаков после запятой  объем инструмента
                         newSecurity.MinTradeAmount = GetMinSize(symbol);
 
-
                         securities.Add(newSecurity);
                     }
                     SecurityEvent(securities);
@@ -240,12 +240,10 @@ namespace OsEngine.Market.Servers.Bitfinex
             catch (Exception exception)
             {
                 SendLogMessage("Securities request exception" + exception.ToString(), LogMessageType.Error);
-
             }
         }
         public double CalculatePriceStep(string price)
         {
-            // Проверяем входную строку на пустоту или null
             if (string.IsNullOrWhiteSpace(price))
             {
                 throw new ArgumentException("Price cannot be null or empty.");
@@ -253,19 +251,16 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             int decimalPlaces = 0;
 
-            // Если есть точка, вычисляем количество знаков после нее
             if (price.Contains("."))
             {
-                // Разделяем строку на части до и после точки, и измеряем длину части после точки
                 decimalPlaces = price.Split('.')[1].Length;
             }
-            // Если есть запятая, аналогичная логика
+
             else if (price.Contains(","))
             {
                 decimalPlaces = price.Split(',')[1].Length;
             }
 
-            // Вычисляем шаг цены как 10 в степени -количество_знаков
             return Math.Pow(10, -decimalPlaces);
         }
         private int DigitsAfterComma(string valueNumber)
@@ -275,32 +270,25 @@ namespace OsEngine.Market.Servers.Bitfinex
             return digitsAfterComma;
         }
 
-        #region минимальный размер торговли
         public Dictionary<string, decimal> minSizes = new Dictionary<string, decimal>();
         public void RequestMinSizes()
         {
-
-            string _apiPatch = "/v2/conf/pub:info:pair"; //для спота
-            //string _apiPatch = "/v2/conf/pub:info:pair:futures";//для фьючерсов
-            var client = new RestClient(_baseUrl);
-            var request = new RestRequest(_apiPatch, Method.GET);
-
-            var response = client.Execute(request);
-
-            if (response.StatusCode == HttpStatusCode.OK && !string.IsNullOrEmpty(response.Content))
+            try
             {
-                try
+                string _apiPatch = "/v2/conf/pub:info:pair"; //для спота
+                var client = new RestClient(_baseUrl);
+                var request = new RestRequest(_apiPatch, Method.GET);
+
+                var response = client.Execute(request);
+
+                if (response.StatusCode == HttpStatusCode.OK && !string.IsNullOrEmpty(response.Content))
                 {
                     var data = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
 
-                    //  Dictionary<string, decimal> minSizes = new Dictionary<string, decimal>();
-
-                    // Внешний цикл для списка массивов
                     for (int i = 0; i < data.Count; i++)
                     {
-                        var subArray = data[i]; // Получаем подмассив
+                        var subArray = data[i];
 
-                        // Внутренний цикл для каждого элемента подмассива
                         for (int j = 0; j < subArray.Count; j++)
                         {
                             if (subArray[j] is JArray pairData && pairData.Count > 1)
@@ -309,30 +297,27 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                                 if (pairData[1] is JArray limits && limits.Count > 3 && limits[3] != null)
                                 {
-                                    // Приведение limits[3] к строке
                                     string minSizeString = limits[3].ToString();
 
-                                    // Попытка преобразовать строку в decimal
                                     if (decimal.TryParse(minSizeString, System.Globalization.NumberStyles.Float,
                                         System.Globalization.CultureInfo.InvariantCulture, out decimal minSize))
                                     {
                                         minSizes.Add(pair, minSize);
                                     }
                                 }
+                                else
+                                {
+                                    SendLogMessage($"Error  json is null", LogMessageType.Error);
+                                }
                             }
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    SendLogMessage($"Error : {ex.Message}", LogMessageType.Error);
-                }
             }
-            else
+            catch (Exception ex)
             {
-                SendLogMessage($"Error  json is null", LogMessageType.Error);
+                SendLogMessage($"Error : {ex.Message}", LogMessageType.Error);
             }
-            // return minSizes;
         }
 
         public decimal GetMinSize(string symbol)
@@ -353,7 +338,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             return _securityType;
         }
-        #endregion
+#endregion
 
         #region 4 Portfolios
 
@@ -501,16 +486,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-        private void UpdateBalance(string json)
-        {
-            List<object> balanceArray = JsonConvert.DeserializeObject<List<object>>(json);
-            List<object> balance = JsonConvert.DeserializeObject<List<object>>(balanceArray[2].ToString());
-            Portfolio portfolio = new Portfolio();
 
-            portfolio.Number = "BitfinexPortfolio";
-            portfolio.ValueBegin = balance[0].ToString().ToDecimal();
-            portfolio.ValueCurrent = balance[1].ToString().ToDecimal();
-        }
 
         #endregion
 
@@ -1091,8 +1067,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                     _webSocketPublic.MessageReceived -= WebSocketPublic_MessageReceived;
                     _webSocketPublic.Error -= WebSocketPublic_Error;
                     _webSocketPublic = null;
-
                 }
+
                 if (_webSocketPrivate != null)
                 {
                     try
@@ -1186,7 +1162,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             try
             {
-
                 if (e.Exception != null)
                 {
                     SendLogMessage(e.Exception.ToString(), LogMessageType.Error);
@@ -1625,8 +1600,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #region  8 Security subscrible 
 
-        private RateGate _rateGateSecurity = new RateGate(30, TimeSpan.FromMinutes(1));
-
         private List<Security> _subscribledSecurities = new List<Security>();
         public void Subscrible(Security security)
         {
@@ -1645,12 +1618,11 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             try
             {
-                _rateGateSecurity.WaitToProceed();
-
                 if (ServerStatus == ServerConnectStatus.Disconnect)
                 {
                     return;
                 }
+
                 for (int i = 0; i < _subscribledSecurities.Count; i++)
                 {
                     if (_subscribledSecurities[i].Name == security.Name &&
@@ -1748,7 +1720,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     {
                         UpdateDepth(message);
                     }
-                  
+
                     if ((message.Contains("te") || message.Contains("tu")) && channelIdTrade != 0)//\"te\"
                     {
                         UpdateTrade(message);
@@ -1799,6 +1771,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 newTrade.Id = tradeData[0].ToString();
                 newTrade.Price = tradeData[3].ToString().ToDecimal();
                 decimal volume = tradeData[2].ToString().ToDecimal();
+
                 if (volume < 0)
                 {
                     volume = Math.Abs(volume);
@@ -1807,7 +1780,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 newTrade.Side = volume > 0 ? Side.Buy : Side.Sell;
                 newTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(tradeData[1]));
 
-                //ServerTime = newTrade.Time;
                 NewTradesEvent?.Invoke(newTrade);
             }
             catch (Exception exception)
@@ -1817,7 +1789,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         private void PrivateMessageReader()
         {
-            Thread.Sleep(1000);
+            Thread.Sleep(2000);
 
             while (true)
             {
@@ -1828,6 +1800,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         Thread.Sleep(1);
                         continue;
                     }
+
                     if (ServerStatus != ServerConnectStatus.Connect)
                     {
                         Thread.Sleep(1000);
@@ -1840,10 +1813,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                     {
                         continue;
                     }
+
                     if (message.Contains("\"event\":\"info\""))
                     {
                         SendLogMessage("WebSocket opened", LogMessageType.System);
                     }
+
                     if (message.Contains("\"event\":\"auth\""))
                     {
                         var authResponse = JsonConvert.DeserializeObject<BitfinexAuthResponseWebSocket>(message);
@@ -1857,6 +1832,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                             SendLogMessage($"WebSocket authentication error: {authResponse.Msg}", LogMessageType.Error);
                         }
                     }
+
                     else if (message.StartsWith("[0,\"tu\",["))
                     {
                         UpdateMyTrade(message);
@@ -1868,18 +1844,14 @@ namespace OsEngine.Market.Servers.Bitfinex
                         UpdateOrder(message);
                     }
 
-                    if (message.StartsWith("[0,\"wu\",["))
+                    else if (message.StartsWith("[0,\"wu\",["))
                     {
                         UpdatePortfolio(message);
-                    }
-
-                    if (message.StartsWith("[0,\"bu\",["))
-                    {
-                        UpdateBalance(message);
                     }
                 }
                 catch (Exception exception)
                 {
+                    Thread.Sleep(5000);
                     SendLogMessage(exception.ToString(), LogMessageType.Error);
                 }
             }
@@ -2711,7 +2683,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             if (orders == null || orders.Count == 0)
             {
-                SendLogMessage("No active orders found.", LogMessageType.Error);
+                SendLogMessage("No active orders found.", LogMessageType.Trade);
                 return;
             }
             for (int i = 0; i < orders.Count; i++)
@@ -2991,7 +2963,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                         {
                             volume = Math.Abs(volume);
                         }
-                        555    decimal preVolume = volume + Math.Abs(Convert.ToDecimal(tradeData[9]));// посмотреть как считается комиссия
+                        /*555 */
+                        decimal preVolume = volume + Math.Abs(Convert.ToDecimal(tradeData[9]));// посмотреть как считается комиссия
 
                         myTrade.Volume = GetVolumeForMyTrade(myTrade.SecurityNameCode, preVolume);
 
