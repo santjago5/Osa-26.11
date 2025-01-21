@@ -60,20 +60,14 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             ServerStatus = ServerConnectStatus.Disconnect;
 
-            Thread threadForPublicMessages = new Thread(PublicMessageReader)
-            {
-                IsBackground = true,
-                Name = "PublicMessageReaderBitfinex"
-            };
-
+            Thread threadForPublicMessages = new Thread(PublicMessageReader);
+            threadForPublicMessages.IsBackground = true;
+            threadForPublicMessages.Name = "PublicMessageReaderBitfinex";
             threadForPublicMessages.Start();
 
-            Thread threadForPrivateMessages = new Thread(PrivateMessageReader)
-            {
-                IsBackground = true,
-                Name = "PrivateMessageReaderBitfinex"
-            };
-
+            Thread threadForPrivateMessages = new Thread(PrivateMessageReader);
+            threadForPrivateMessages.IsBackground = true;
+            threadForPrivateMessages.Name = "PrivateMessageReaderBitfinex";
             threadForPrivateMessages.Start();
         }
         public DateTime ServerTime { get; set; }
@@ -149,9 +143,13 @@ namespace OsEngine.Market.Servers.Bitfinex
         #region 2 Properties 
         public List<IServerParameter> ServerParameters { get; set; }
         public ServerConnectStatus ServerStatus { get; set; }
+
         private string _publicKey = "";
+
         private string _secretKey = "";
+
         private string _baseUrl = "https://api.bitfinex.com";
+
         #endregion
 
         #region 3 Securities
@@ -332,7 +330,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return minSize;
             }
 
-            return 1; 
+            return 1;
         }
 
         private SecurityType GetSecurityType(string type)
@@ -607,7 +605,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             DateTime startTime = timeEnd - TimeSpan.FromMinutes(tf.TotalMinutes * countToLoad);
 
             HashSet<DateTime> uniqueTimes = new HashSet<DateTime>();//////////////////////////////////////////////////
-         
+
             int totalMinutes = (int)(timeEnd - startTime).TotalMinutes;
 
             DateTime currentStartDate = startTime;
@@ -626,7 +624,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     periodEnd = DateTime.UtcNow;
                 }
                 string timeFrame = GetInterval(tf);
-                
+
                 List<Candle> rangeCandles = CreateQueryCandles(nameSec, timeFrame, periodStart, periodEnd, candlesToLoad);
 
                 if (rangeCandles == null || rangeCandles.Count == 0)
@@ -983,7 +981,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         #endregion
 
         #region  6 WebSocket creation
-     
+
         private WebSocket _webSocketPublic;
         private WebSocket _webSocketPrivate;
 
@@ -1644,20 +1642,18 @@ namespace OsEngine.Market.Servers.Bitfinex
         int channelIdTrade;
         private void PublicMessageReader()
         {
-            Thread.Sleep(1000);
-
             while (true)
             {
                 try
                 {
-                    if (ServerStatus != ServerConnectStatus.Connect)
+                    if (ServerStatus == ServerConnectStatus.Disconnect)
                     {
                         Thread.Sleep(2000);
                         continue;
                     }
                     if (_webSocketPublicMessage.IsEmpty)
                     {
-                        Thread.Sleep(2);
+                        Thread.Sleep(1);
                         continue;
                     }
 
@@ -1775,21 +1771,19 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         private void PrivateMessageReader()
         {
-            Thread.Sleep(2000);
-
             while (true)
             {
                 try
                 {
-                    if (_webSocketPrivateMessage.IsEmpty)
+                    if (ServerStatus == ServerConnectStatus.Disconnect)
                     {
-                        Thread.Sleep(1);
+                        Thread.Sleep(1000);
                         continue;
                     }
 
-                    if (ServerStatus != ServerConnectStatus.Connect)
+                    if (_webSocketPrivateMessage.IsEmpty)
                     {
-                        Thread.Sleep(1000);
+                        Thread.Sleep(1);
                         continue;
                     }
 
