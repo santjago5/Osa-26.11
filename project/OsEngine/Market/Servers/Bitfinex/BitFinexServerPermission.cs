@@ -155,34 +155,13 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public string[] ManuallyClosePositionOnBoard_ValuesForTrimmingName
         {
-            get
-            {
-                string[] values = new string[]
-                {
-                    "LONG",
-                    "SHORT",
-                };
-
-                return values;
-            }
+            get { return null; }
         }
 
         public string[] ManuallyClosePositionOnBoard_ExceptionPositionNames
         {
-            get
-            {
-                string[] values = new string[]
-                {
-                    "USD",
-                    "EUR",
-                    "GBP",
-                    "JPY"
-                };
-
-                return values;
-            }
+            get { return null; }
         }
-
 
         public bool CanQueryOrdersAfterReconnect
         {

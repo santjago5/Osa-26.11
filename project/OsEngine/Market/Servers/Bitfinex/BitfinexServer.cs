@@ -229,7 +229,11 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                         securities.Add(newSecurity);
                     }
-                    SecurityEvent(securities);
+
+                    if (SecurityEvent != null)
+                    {
+                        SecurityEvent(securities);
+                    }
                 }
                 else
                 {
@@ -246,7 +250,8 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             if (string.IsNullOrWhiteSpace(price))
             {
-                throw new ArgumentException("Price cannot be null or empty.");
+                SendLogMessage("Price cannot be null or empty.", LogMessageType.Error);
+                return 0;
             }
 
             int decimalPlaces = 0;
@@ -486,7 +491,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #region 5 Data Candles
 
-        private readonly RateGate _rateGateCandleHistory = new RateGate(30, TimeSpan.FromMinutes(1));
+        private RateGate _rateGateCandleHistory = new RateGate(30, TimeSpan.FromMinutes(1));
         public List<Trade> GetTickDataToSecurity(Security security, DateTime startTime, DateTime endTime, DateTime actualTime)
         {
             List<Trade> trades = new List<Trade>();
@@ -982,11 +987,12 @@ namespace OsEngine.Market.Servers.Bitfinex
         private WebSocket _webSocketPublic;
         private WebSocket _webSocketPrivate;
 
-        private ConcurrentQueue<string> WebSocketPublicMessage = new ConcurrentQueue<string>();
-        private ConcurrentQueue<string> WebSocketPrivateMessage = new ConcurrentQueue<string>();
+        private ConcurrentQueue<string> _webSocketPublicMessage = new ConcurrentQueue<string>();
+        private ConcurrentQueue<string> _webSocketPrivateMessage = new ConcurrentQueue<string>();
 
-        private readonly string _webSocketPublicUrl = "wss://api-pub.bitfinex.com/ws/2";
-        private readonly string _webSocketPrivateUrl = "wss://api.bitfinex.com/ws/2";
+        private string _webSocketPublicUrl = "wss://api-pub.bitfinex.com/ws/2";
+        private string _webSocketPrivateUrl = "wss://api.bitfinex.com/ws/2";
+
         private Timer _pingTimer;
         private void CreateWebSocketConnection()
         {
@@ -996,9 +1002,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     return;
                 }
-
-                //_socketPublicIsActive = false;
-                // _socketPrivateIsActive = false;
 
                 _webSocketPublic = new WebSocket(_webSocketPublicUrl)
                 {
@@ -1161,7 +1164,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     return;
                 }
 
-                if (WebSocketPublicMessage == null)
+                if (_webSocketPublicMessage == null)
                 {
                     return;
                 }
@@ -1185,7 +1188,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     return;
                 }
 
-                if (WebSocketPublicMessage == null)
+                if (_webSocketPublicMessage == null)
                 {
                     return;
                 }
@@ -1195,7 +1198,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     return;
                 }
 
-                WebSocketPublicMessage.Enqueue(e.Message);
+                _webSocketPublicMessage.Enqueue(e.Message);
             }
             catch (Exception exception)
             {
@@ -1203,7 +1206,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
         public event Action<MarketDepth> MarketDepthEvent;
-        public string GetSymbolByKeyInDepth(int channelId)
+        private string GetSymbolByKeyInDepth(int channelId)
         {
             string symbol = "";
 
@@ -1568,12 +1571,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     return;
                 }
-                if (WebSocketPrivateMessage == null)
+                if (_webSocketPrivateMessage == null)
                 {
                     return;
                 }
 
-                WebSocketPrivateMessage.Enqueue(e.Message);
+                _webSocketPrivateMessage.Enqueue(e.Message);
             }
             catch (Exception exception)
             {
@@ -1652,13 +1655,13 @@ namespace OsEngine.Market.Servers.Bitfinex
                         Thread.Sleep(2000);
                         continue;
                     }
-                    if (WebSocketPublicMessage.IsEmpty)
+                    if (_webSocketPublicMessage.IsEmpty)
                     {
                         Thread.Sleep(2);
                         continue;
                     }
 
-                    WebSocketPublicMessage.TryDequeue(out string message);
+                    _webSocketPublicMessage.TryDequeue(out string message);
 
                     if (message == null)
                     {
@@ -1717,7 +1720,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-        public string GetSymbolByKeyInTrades(int channelId)
+        private string GetSymbolByKeyInTrades(int channelId)
         {
             string symbol = "";
 
@@ -1778,7 +1781,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 try
                 {
-                    if (WebSocketPrivateMessage.IsEmpty)
+                    if (_webSocketPrivateMessage.IsEmpty)
                     {
                         Thread.Sleep(1);
                         continue;
@@ -1790,7 +1793,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         continue;
                     }
 
-                    WebSocketPrivateMessage.TryDequeue(out string message);
+                    _webSocketPrivateMessage.TryDequeue(out string message);
 
                     if (message == null)
                     {
