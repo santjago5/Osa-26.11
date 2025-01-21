@@ -322,23 +322,21 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public decimal GetMinSize(string symbol)
         {
-            // Проверяем наличие символа в словаре
             if (minSizes.TryGetValue(symbol, out decimal minSize))
             {
-                return minSize; // Возвращаем минимальный размер
+                return minSize;
             }
 
-            return 1; // Если символ не найден
+            return 1; 
         }
 
-        #endregion
         private SecurityType GetSecurityType(string type)
         {
             SecurityType _securityType = type.StartsWith("t") ? SecurityType.CurrencyPair : SecurityType.Futures;
 
             return _securityType;
         }
-#endregion
+        #endregion
 
         #region 4 Portfolios
 
@@ -369,8 +367,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
                 RestClient client = new RestClient(_baseUrl);
-
                 var request = new RestRequest(_apiPath, Method.POST);
+
                 request.AddHeader("accept", "application/json");
                 request.AddHeader("bfx-nonce", nonce);
                 request.AddHeader("bfx-apikey", _publicKey);
@@ -379,12 +377,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 IRestResponse response = client.Execute(request);
 
                 if (response.StatusCode == HttpStatusCode.OK)
-                {//[["exchange","TRX",87.687002,0,87.687002,"Trading fees for 22.0 TRX (TRXUSD) @ 0.2467 on BFX (0.2%)",null],
-                 //["exchange","USD",1.67033127,0,1.67033127,"Exchange 22.0 TRX for USD @ 0.24674",{"reason":"TRADE","order_id":192699206296,"order_id_oppo":192699836818,"trade_price":"0.24674","trade_amount":"22.0","order_cid":1469,"order_gid":null}],
-                 //["exchange","FLR",9.8e-7,0,9.8e-7,"Exchange 868.608238 FLR for USD @ 0.013422",{"reason":"TRADE","order_id":179411603688,"order_id_oppo":179878103613,"trade_price":"0.013422","trade_amount":"-868.608238","order_cid":1730546344388,"order_gid":null}]]
-
+                {
                     Portfolio portfolio = new Portfolio();
-
                     portfolio.Number = "BitfinexPortfolio";
                     portfolio.ValueBegin = 1;
                     portfolio.ValueCurrent = 1;
@@ -446,21 +440,24 @@ namespace OsEngine.Market.Servers.Bitfinex
                     return;
                 }
 
-                Portfolio portfolio = new Portfolio();
+                if (wallet == null)
+                {
+                    return;
+                }
 
+                Portfolio portfolio = new Portfolio();
                 portfolio.Number = "BitfinexPortfolio";
                 portfolio.ValueBegin = 1;
                 portfolio.ValueCurrent = 1;
                 portfolio.ServerType = ServerType.Bitfinex;
+
                 if (wallet[0].ToString() == "exchange")
                 {
                     PositionOnBoard position = new PositionOnBoard();
-
                     position.PortfolioName = "BitfinexPortfolio";
                     position.SecurityNameCode = wallet[1].ToString();
                     position.ValueCurrent = wallet[2].ToString().ToDecimal();
                     position.ValueBegin = wallet[2].ToString().ToDecimal();
-
 
                     if (wallet[4] != null)
                     {
@@ -480,14 +477,11 @@ namespace OsEngine.Market.Servers.Bitfinex
                     PortfolioEvent?.Invoke(_portfolios);
                 }
             }
-
             catch (Exception exception)
             {
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-
-
         #endregion
 
         #region 5 Data Candles
@@ -553,7 +547,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 long endDate = (long)(endTime.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalMilliseconds;
 
                 string _apiPath = $"/v2/trades/{security}/hist?limit={count}&start={startDate}&end={endDate}";
-
                 RestClient client = new RestClient(_baseUrl);
                 var request = new RestRequest(_apiPath, Method.GET);
                 request.AddHeader("accept", "application/json");
@@ -574,7 +567,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                     for (int i = 0; i < tradeList.Count; i++)
                     {
                         Trade newTrade = new Trade();
-
                         newTrade.Id = tradeList[i][0].ToString();
                         newTrade.Time = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(tradeList[i][1]));
                         newTrade.SecurityNameCode = security;
@@ -603,49 +595,40 @@ namespace OsEngine.Market.Servers.Bitfinex
         public List<Candle> GetCandleHistory(string nameSec, TimeSpan tf, bool isOsData, int countToLoad, DateTime timeEnd)
         {
 
-            // Максимальное количество свечей, которое можно запросить за один раз
             int limit = 10000;
 
-            // Итоговый список для всех свечей
             List<Candle> allCandles = new List<Candle>();
 
-            // Вычисляем начальное время для загрузки свечей
             DateTime startTime = timeEnd - TimeSpan.FromMinutes(tf.TotalMinutes * countToLoad);
-            HashSet<DateTime> uniqueTimes = new HashSet<DateTime>();
-            // Количество минут для загрузки
+
+            HashSet<DateTime> uniqueTimes = new HashSet<DateTime>();//////////////////////////////////////////////////
+         
             int totalMinutes = (int)(timeEnd - startTime).TotalMinutes;
 
-            // Начальное время текущей загрузки
             DateTime currentStartDate = startTime;
 
-            // Счетчик загруженных свечей
             int candlesLoaded = 0;
 
             while (candlesLoaded < countToLoad)
             {
-                // Определяем количество свечей для текущей итерации
                 int candlesToLoad = Math.Min(limit, countToLoad - candlesLoaded);
 
-                // Вычисляем начало и конец периода для запроса
                 DateTime periodStart = currentStartDate;
                 DateTime periodEnd = periodStart.AddMinutes(tf.TotalMinutes * candlesToLoad);
 
-                // Ограничиваем конец периода текущим временем, если он выходит за пределы
                 if (periodEnd > DateTime.UtcNow)
                 {
                     periodEnd = DateTime.UtcNow;
                 }
                 string timeFrame = GetInterval(tf);
-                // Запрашиваем свечи за указанный период
+                
                 List<Candle> rangeCandles = CreateQueryCandles(nameSec, timeFrame, periodStart, periodEnd, candlesToLoad);
 
-                // Если данные не были получены, завершаем загрузку
                 if (rangeCandles == null || rangeCandles.Count == 0)
                 {
                     break;
                 }
 
-                // Фильтруем свечи, чтобы не допускать дублирования по времени
                 for (int i = 0; i < rangeCandles.Count; i++)
                 {
                     if (uniqueTimes.Add(rangeCandles[i].TimeStart))
@@ -659,18 +642,17 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 // Обновляем количество загруженных свечей
                 int actualCandlesLoaded = rangeCandles.Count;
+
                 candlesLoaded += actualCandlesLoaded;
 
-                // Обновляем текущее начальное время для следующего запроса
                 currentStartDate = rangeCandles[rangeCandles.Count - 1].TimeStart.AddMinutes(tf.TotalMinutes);
 
-                // Если загрузка завершена, выходим из цикла
                 if (candlesLoaded >= countToLoad || currentStartDate >= timeEnd)
                 {
                     break;
                 }
             }
-            // Удаление дублирующих свечей в allCandles
+
             for (int i = allCandles.Count - 1; i > 0; i--)
             {
                 if (allCandles[i].TimeStart == allCandles[i - 1].TimeStart)
@@ -798,7 +780,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         public List<Candle> GetCandleDataToSecurity(Security security, TimeFrameBuilder timeFrameBuilder, DateTime startTime, DateTime endTime, DateTime actualTime)
         {
-            if (startTime != actualTime)//686/1764/1386/1346/1123/805/367/321
+            if (startTime != actualTime)
             {
                 startTime = actualTime;
             }
@@ -807,6 +789,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 return null;
             }
+
             if (endTime > DateTime.UtcNow)
             {
                 endTime = DateTime.UtcNow;
@@ -818,7 +801,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         private bool CheckTime(DateTime startTime, DateTime endTime, DateTime actualTime)
         {
-
             if (startTime >= endTime ||
                 startTime >= DateTime.Now ||
                 actualTime > endTime ||
@@ -892,7 +874,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             long endDate = (long)(endTime.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalMilliseconds;
 
             string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?sort=1&start={startDate}&end={endDate}&limit={limit}";
-
             RestClient client = new RestClient(_baseUrl);
             var request = new RestRequest(_apiPath, Method.GET);
             request.AddHeader("accept", "application/json");
@@ -997,9 +978,12 @@ namespace OsEngine.Market.Servers.Bitfinex
         #endregion
 
         #region  6 WebSocket creation
-        // ConcurrentQueue<string>;
+     
         private WebSocket _webSocketPublic;
         private WebSocket _webSocketPrivate;
+
+        private ConcurrentQueue<string> WebSocketPublicMessage = new ConcurrentQueue<string>();
+        private ConcurrentQueue<string> WebSocketPrivateMessage = new ConcurrentQueue<string>();
 
         private readonly string _webSocketPublicUrl = "wss://api-pub.bitfinex.com/ws/2";
         private readonly string _webSocketPrivateUrl = "wss://api.bitfinex.com/ws/2";
@@ -1650,10 +1634,9 @@ namespace OsEngine.Market.Servers.Bitfinex
         public event Action<MyTrade> MyTradeEvent;
         public event Action<Order> MyOrderEvent;
 
-        private ConcurrentQueue<string> WebSocketPublicMessage = new ConcurrentQueue<string>();
-        private ConcurrentQueue<string> WebSocketPrivateMessage = new ConcurrentQueue<string>();
         private Dictionary<int, string> _tradeDictionary = new Dictionary<int, string>();
         private Dictionary<int, string> _depthDictionary = new Dictionary<int, string>();
+
         int currentChannelIdDepth;
         int channelIdTrade;
         private void PublicMessageReader()
