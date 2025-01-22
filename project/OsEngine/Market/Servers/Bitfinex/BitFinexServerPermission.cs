@@ -10,7 +10,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
 
         #region DataFeedPermissions
-
         public bool DataFeedTf1SecondCanLoad
         {
             get { return false; }
@@ -87,27 +86,22 @@ namespace OsEngine.Market.Servers.Bitfinex
         #endregion
 
         #region Trade permission
-
         public bool MarketOrdersIsSupport
         {
             get { return true; }
         }
-
         public bool IsTradeServer
         {
             get { return true; }
         }
-
         public bool IsCanChangeOrderPrice
         {
             get { return true; }
         }
-
         public TimeFramePermission TradeTimeFramePermission
         {
             get { return _tradeTimeFramePermission; }
         }
-
         public int WaitTimeSecondsAfterFirstStartToSendOrders
         {
             get { return 5; }
@@ -142,37 +136,30 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             get { return true; }
         }
-
         public bool IsUseLotToCalculateProfit
         {
             get { return true; }
         }
-
         public bool ManuallyClosePositionOnBoard_IsOn
         {
             get { return true; }
         }
-
         public string[] ManuallyClosePositionOnBoard_ValuesForTrimmingName
         {
             get { return null; }
         }
-
         public string[] ManuallyClosePositionOnBoard_ExceptionPositionNames
         {
             get { return null; }
         }
-
         public bool CanQueryOrdersAfterReconnect
         {
             get { return true; }
         }
-
         public bool CanQueryOrderStatus
         {
             get { return true; }
         }
-
         public bool DataFeedTfDayCanLoad
         {
             get { return true; }
