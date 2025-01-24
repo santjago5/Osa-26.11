@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Timers;
+using Com.Lmax.Api.Internal;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OsEngine.Entity;
@@ -68,24 +69,24 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             try
             {
-                SendLogMessage("Start Bitfinex Connection", LogMessageType.System);
-
                 _publicKey = ((ServerParameterString)ServerParameters[0]).Value;
                 _secretKey = ((ServerParameterPassword)ServerParameters[1]).Value;
 
                 if (string.IsNullOrEmpty(_publicKey) || string.IsNullOrEmpty(_secretKey))
                 {
-                    SendLogMessage("Connection failed. Authorization exception", LogMessageType.Error);
+                    SendLogMessage("Error:Invalid public or secret key.", LogMessageType.Error);
                     ServerStatus = ServerConnectStatus.Disconnect;
                     DisconnectEvent();
                     return;
                 }
+
                 string _apiPath = "v2/platform/status";
                 RestClient client = new RestClient(_baseUrl);
                 RestRequest request = new RestRequest(_apiPath);
                 request.AddHeader("accept", "application/json");
 
                 IRestResponse response = client.Execute(request);
+
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -94,6 +95,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     if (responseBody.Contains("1"))
                     {
                         CreateWebSocketConnection();
+                        SendLogMessage("Start Bitfinex Connection", LogMessageType.System);
                     }
                 }
             }
@@ -198,9 +200,11 @@ namespace OsEngine.Market.Servers.Bitfinex
                     for (int i = 0; i < securityList.Count; i++)
                     {
                         List<object> item = securityList[i];
+
                         string symbol = item[0]?.ToString();
                         string price = item[1]?.ToString()?.Replace('.', ',');
                         string volume = item[8]?.ToString()?.Replace('.', ',');
+
                         SecurityType securityType = GetSecurityType(symbol);
 
                         if (securityType == SecurityType.None)
@@ -219,7 +223,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newSecurity.Lot = 1;
                         newSecurity.State = SecurityStateType.Activ;
                         newSecurity.Decimals = DigitsAfterComma(price);
-                        newSecurity.PriceStep = CalculatePriceStep(price).ToString().ToDecimal();//1;   /*newSecurity.Decimals.GetValueByDecimals();*/
+                        newSecurity.PriceStep = newSecurity.Decimals.GetValueByDecimals();
+                      //  newSecurity.PriceStep = CalculatePriceStep(price).ToString().ToDecimal();//1;   /*newSecurity.Decimals.GetValueByDecimals();*/
                         newSecurity.PriceStepCost = newSecurity.PriceStep;                             //(newSecurity.PriceStep) * (price).ToDecimal();
                         newSecurity.DecimalsVolume = DigitsAfterComma(volume);                       //кол-во знаков после запятой  объем инструмента
                         newSecurity.MinTradeAmount = GetMinSize(symbol);
@@ -362,6 +367,10 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             try
             {
+                if (_publicKey == null || _secretKey == null)
+                {
+                    return;
+                }
                 string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
                 string _apiPath = "v2/auth/r/wallets";
                 string signature = $"/api/{_apiPath}{nonce}";
@@ -424,7 +433,10 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 else
                 {
-                    SendLogMessage($"Error Query Portfolio: {response.Content}", LogMessageType.Error);
+                    SendLogMessage($"Error rest request: Invalid public or secret key.{response.Content}", LogMessageType.Error);
+                    ServerStatus = ServerConnectStatus.Disconnect;
+                    DisconnectEvent();
+                    
                 }
             }
             catch (Exception exception)
@@ -591,7 +603,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
                 else
                 {
-                    SendLogMessage($"API вернул ошибку: {response.StatusCode} - {response.Content}", LogMessageType.Error);
+                    SendLogMessage($"The request returned an error. { response.StatusCode} - {response.Content}", LogMessageType.Error);
                     return null;
                 }
             }
@@ -1698,7 +1710,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         int channelId = Convert.ToInt32(root[0]);
                         if (root == null || root.Count < 2)
                         {
-                            SendLogMessage("Некорректный формат сообщения: недостаточно элементов.", LogMessageType.Error);
+                            SendLogMessage("Incorrect message format: insufficient elements.", LogMessageType.Error);
                             return;
                         }
                         if (channelId == _currentChannelIdDepth)
@@ -1764,7 +1776,9 @@ namespace OsEngine.Market.Servers.Bitfinex
                         }
                         else
                         {
-                            SendLogMessage($"WebSocket authentication error: {authResponse.Msg}", LogMessageType.Error);
+                            ServerStatus = ServerConnectStatus.Disconnect;
+                            DisconnectEvent();
+                            SendLogMessage($"WebSocket authentication error: Invalid public or secret key: {authResponse.Msg}", LogMessageType.Error);
                         }
                     }
 
