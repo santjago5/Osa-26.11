@@ -118,16 +118,18 @@ namespace OsEngine.Market.Servers.Bitfinex
                 //depthDictionary.Clear();//////////
 
                 DeleteWebSocketConnection();
+
+
+
+                if (ServerStatus != ServerConnectStatus.Disconnect)
+                {
+                    ServerStatus = ServerConnectStatus.Disconnect;
+                    DisconnectEvent();
+                }
             }
             catch (Exception exception)
             {
                 SendLogMessage("Connection closed by Bitfinex. WebSocket Data Closed Event" + exception.ToString(), LogMessageType.System);
-            }
-
-            if (ServerStatus != ServerConnectStatus.Disconnect)
-            {
-                ServerStatus = ServerConnectStatus.Disconnect;
-                DisconnectEvent();
             }
         }
         public ServerType ServerType => ServerType.Bitfinex;
@@ -163,12 +165,13 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public void GetSecurities()
         {
-            _rateGateSecurity.WaitToProceed();
-
-            RequestMinSizes();
-
             try
             {
+                _rateGateSecurity.WaitToProceed();
+
+                RequestMinSizes();
+
+
                 string _apiPath = "v2/tickers?symbols=ALL";
                 RestClient client = new RestClient(_baseUrl);
                 RestRequest request = new RestRequest(_apiPath);
@@ -222,11 +225,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newSecurity.SecurityType = securityType;
                         newSecurity.Lot = 1;
                         newSecurity.State = SecurityStateType.Activ;
-                        newSecurity.Decimals = DigitsAfterComma(price);
+                        newSecurity.Decimals = price.DecimalsCount();
                         newSecurity.PriceStep = newSecurity.Decimals.GetValueByDecimals();
-                      //  newSecurity.PriceStep = CalculatePriceStep(price).ToString().ToDecimal();//1;   /*newSecurity.Decimals.GetValueByDecimals();*/
-                        newSecurity.PriceStepCost = newSecurity.PriceStep;                             //(newSecurity.PriceStep) * (price).ToDecimal();
-                        newSecurity.DecimalsVolume = DigitsAfterComma(volume);                       //кол-во знаков после запятой  объем инструмента
+                        newSecurity.PriceStepCost = newSecurity.PriceStep;
+                        newSecurity.DecimalsVolume = DigitsAfterComma(volume);
                         newSecurity.MinTradeAmount = GetMinSize(symbol);
 
                         securities.Add(newSecurity);
@@ -363,10 +365,9 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         private void CreateQueryPortfolio()
         {
-            _rateGatePortfolio.WaitToProceed();
-
             try
             {
+                _rateGatePortfolio.WaitToProceed();
                 if (_publicKey == null || _secretKey == null)
                 {
                     return;
@@ -436,7 +437,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     SendLogMessage($"Error rest request: Invalid public or secret key.{response.Content}", LogMessageType.Error);
                     ServerStatus = ServerConnectStatus.Disconnect;
                     DisconnectEvent();
-                    
+
                 }
             }
             catch (Exception exception)
@@ -603,7 +604,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
                 else
                 {
-                    SendLogMessage($"The request returned an error. { response.StatusCode} - {response.Content}", LogMessageType.Error);
+                    SendLogMessage($"The request returned an error. {response.StatusCode} - {response.Content}", LogMessageType.Error);
                     return null;
                 }
             }
@@ -889,20 +890,21 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         private List<Candle> CreateQueryCandles(string nameSec, string tf, DateTime startTime, DateTime endTime, int limit)
         {
-            _rateGateCandleHistory.WaitToProceed();
-
-            long startDate = (long)(startTime.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalMilliseconds;
-            long endDate = (long)(endTime.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalMilliseconds;
-
-            string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?sort=1&start={startDate}&end={endDate}&limit={limit}";
-            RestClient client = new RestClient(_baseUrl);
-            var request = new RestRequest(_apiPath, Method.GET);
-            request.AddHeader("accept", "application/json");
-
-            IRestResponse response = client.Execute(request);
-
             try
             {
+                _rateGateCandleHistory.WaitToProceed();
+
+                long startDate = (long)(startTime.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalMilliseconds;
+                long endDate = (long)(endTime.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalMilliseconds;
+
+                string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?sort=1&start={startDate}&end={endDate}&limit={limit}";
+                RestClient client = new RestClient(_baseUrl);
+                var request = new RestRequest(_apiPath, Method.GET);
+                request.AddHeader("accept", "application/json");
+
+                IRestResponse response = client.Execute(request);
+
+
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     string jsonResponse = response.Content;
@@ -1105,9 +1107,9 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #region  7 WebSocket events
 
-      //  private bool _socketPublicIsActive;
+        //  private bool _socketPublicIsActive;
 
-      //  private bool _socketPrivateIsActive;
+        //  private bool _socketPrivateIsActive;
         private void SendPing(object sender, ElapsedEventArgs e)
         {
             try
@@ -1129,7 +1131,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             try
             {
-               // _socketPublicIsActive = true;//отвечает за соединение
+                // _socketPublicIsActive = true;//отвечает за соединение
 
                 CheckActivationSockets();
 
@@ -1480,40 +1482,56 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         private void WebSocketPrivate_Opened(object sender, EventArgs e)
         {
-            GenerateAuthenticate();
-   
-            CheckActivationSockets();
+            try
+            {
+                GenerateAuthenticate();
 
-            SendLogMessage("Connection to private data is Open", LogMessageType.System);
+                CheckActivationSockets();
 
-            // Настраиваем таймер для отправки пинга каждые 30 секунд
-            _pingTimer = new Timer(30000); // 30 секунд
-            _pingTimer.Elapsed += SendPing;
-            _pingTimer.AutoReset = true;
-            _pingTimer.Start();
+                SendLogMessage("Connection to private data is Open", LogMessageType.System);
+
+                // Настраиваем таймер для отправки пинга каждые 30 секунд
+                _pingTimer = new Timer(30000); // 30 секунд
+                _pingTimer.Elapsed += SendPing;
+                _pingTimer.AutoReset = true;
+                _pingTimer.Start();
+            }
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
+
         }
         private void GenerateAuthenticate()
         {
-            string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-            string authPayload = "AUTH" + nonce;
-            string authSig;
-            using (var hmac = new HMACSHA384(Encoding.UTF8.GetBytes(_secretKey)))
+            try
             {
-                byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(authPayload));
-                authSig = BitConverter.ToString(hash).Replace("-", "").ToLower();
+                string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
+                string authPayload = "AUTH" + nonce;
+                string authSig;
+                using (var hmac = new HMACSHA384(Encoding.UTF8.GetBytes(_secretKey)))
+                {
+                    byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(authPayload));
+                    authSig = BitConverter.ToString(hash).Replace("-", "").ToLower();
+                }
+
+                var payload = new
+                {
+                    @event = "auth",
+                    apiKey = _publicKey,
+                    authSig = authSig,
+                    authNonce = nonce,
+                    authPayload = authPayload
+                };
+                string authJson = JsonConvert.SerializeObject(payload);
+
+                _webSocketPrivate.Send(authJson);
+
             }
-            var payload = new
+            catch (Exception exception)
             {
-                @event = "auth",
-                apiKey = _publicKey,
-                authSig = authSig,
-                authNonce = nonce,
-                authPayload = authPayload
-            };
-            string authJson = JsonConvert.SerializeObject(payload);
-
-            _webSocketPrivate.Send(authJson);
-
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
         }
         private void CheckActivationSockets()
         {
@@ -1870,8 +1888,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                     return;
                 }
 
-
                 var tradeDataJson = tradyList[2]?.ToString();///посмотреть
+
                 if (string.IsNullOrEmpty(tradeDataJson))
                 {
                     return;
@@ -2055,7 +2073,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #region  10 Trade
 
-        private RateGate _rateGateSendOrder = new RateGate(90, TimeSpan.FromMinutes(1));
+        private RateGate _rateGateOrder = new RateGate(90, TimeSpan.FromMinutes(1));
 
         private RateGate _rateGateCancelOrder = new RateGate(90, TimeSpan.FromMinutes(1));
 
@@ -2064,58 +2082,58 @@ namespace OsEngine.Market.Servers.Bitfinex
         private RateGate _rateGateChangePriceOrder = new RateGate(90, TimeSpan.FromMinutes(1));
         public void SendOrder(Order order)
         {
-            _rateGateSendOrder.WaitToProceed();
-
-            string nonce = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-            string _apiPath = "v2/auth/w/order/submit";
-
-            BitfinexOrderData newOrder = new BitfinexOrderData();
-            newOrder.Cid = order.NumberUser.ToString();
-            newOrder.Symbol = order.SecurityNameCode;
-            order.PortfolioNumber = "BitfinexPortfolio";
-            if (order.TypeOrder == OrderPriceType.Limit)
-            {
-                newOrder.OrderType = "EXCHANGE LIMIT";
-            }
-            else
-            {
-                newOrder.OrderType = "EXCHANGE MARKET";
-            }
-            // newOrder.OrderType = order.TypeOrder.ToString() == "Limit" ? "EXCHANGE LIMIT" : "EXCHANGE MARKET";
-            newOrder.Price = order.TypeOrder == OrderPriceType.Market ? null : order.Price.ToString().Replace(",", ".");
-            if (order.Side.ToString() == "Sell")
-            {
-                //newOrder.Amount = (-order.Volume).ToString(CultureInfo.InvariantCulture);
-                newOrder.Amount = "-" + (order.Volume).ToString().Replace(",", ".");
-            }
-            else
-            {
-                //newOrder.Amount = order.Volume.ToString(CultureInfo.InvariantCulture);
-                newOrder.Amount = (order.Volume).ToString().Replace(",", ".");
-            }
-            string body = $"{{\"type\":\"{newOrder.OrderType}\",\"symbol\":\"{newOrder.Symbol}\",\"amount\":\"{newOrder.Amount}\",\"price\":\"{newOrder.Price}\",\"cid\":{newOrder.Cid}}}";
-            //var body = $"{{\"type\":\"{newOrder.OrderType}\"," +
-            //      $"\"symbol\":\"{newOrder.Symbol}\"," +
-            //      $"\"amount\":\"{newOrder.Amount}\"," +
-            //      $"\"price\":\"{newOrder.Price}\"," +
-            //      $"\"cid\":{newOrder.Cid}}}";
-
-            string signature = $"/api/{_apiPath}{nonce}{body}";
-
-            var client = new RestClient(_baseUrl);
-            var request = new RestRequest(_apiPath, Method.POST);
-            string sig = ComputeHmacSha384(_secretKey, signature);
-
-            request.AddHeader("accept", "application/json");
-            request.AddHeader("bfx-nonce", nonce);
-            request.AddHeader("bfx-apikey", _publicKey);
-            request.AddHeader("bfx-signature", sig);
-            request.AddParameter("application/json", body, ParameterType.RequestBody);
-
-            var response = client.Execute(request);
-
             try
             {
+                _rateGateOrder.WaitToProceed();
+
+                string nonce = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+                string _apiPath = "v2/auth/w/order/submit";
+
+                BitfinexOrderData newOrder = new BitfinexOrderData();
+                newOrder.Cid = order.NumberUser.ToString();
+                newOrder.Symbol = order.SecurityNameCode;
+                order.PortfolioNumber = "BitfinexPortfolio";
+
+                if (order.TypeOrder == OrderPriceType.Limit)
+                {
+                    newOrder.OrderType = "EXCHANGE LIMIT";
+                }
+                else
+                {
+                    newOrder.OrderType = "EXCHANGE MARKET";
+                }
+                // newOrder.OrderType = order.TypeOrder.ToString() == "Limit" ? "EXCHANGE LIMIT" : "EXCHANGE MARKET";
+                newOrder.Price = order.TypeOrder == OrderPriceType.Market ? null : order.Price.ToString().Replace(",", ".");
+                if (order.Side.ToString() == "Sell")
+                {
+                    //newOrder.Amount = (-order.Volume).ToString(CultureInfo.InvariantCulture);
+                    newOrder.Amount = "-" + (order.Volume).ToString().Replace(",", ".");
+                }
+                else
+                {
+                    //newOrder.Amount = order.Volume.ToString(CultureInfo.InvariantCulture);
+                    newOrder.Amount = (order.Volume).ToString().Replace(",", ".");
+                }
+                string body = $"{{\"type\":\"{newOrder.OrderType}\",\"symbol\":\"{newOrder.Symbol}\",\"amount\":\"{newOrder.Amount}\",\"price\":\"{newOrder.Price}\",\"cid\":{newOrder.Cid}}}";
+                //var body = $"{{\"type\":\"{newOrder.OrderType}\"," +
+                //      $"\"symbol\":\"{newOrder.Symbol}\"," +
+                //      $"\"amount\":\"{newOrder.Amount}\"," +
+                //      $"\"price\":\"{newOrder.Price}\"," +
+                //      $"\"cid\":{newOrder.Cid}}}";
+
+                string signature = $"/api/{_apiPath}{nonce}{body}";
+
+                var client = new RestClient(_baseUrl);
+                var request = new RestRequest(_apiPath, Method.POST);
+                string sig = ComputeHmacSha384(_secretKey, signature);
+
+                request.AddHeader("accept", "application/json");
+                request.AddHeader("bfx-nonce", nonce);
+                request.AddHeader("bfx-apikey", _publicKey);
+                request.AddHeader("bfx-signature", sig);
+                request.AddParameter("application/json", body, ParameterType.RequestBody);
+
+                var response = client.Execute(request);
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     string responseBody = response.Content;
@@ -2197,32 +2215,33 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         public void CancelAllOrders()
         {
-            _rateGateCancelAllOrder.WaitToProceed();
-
-            string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-
-            string _apiPath = "v2/auth/w/order/cancel/multi";
-            string body = $"{{\"all\":1}}";
-
-            string signature = $"/api/{_apiPath}{nonce}{body}";
-            var client = new RestClient(_baseUrl);
-            var request = new RestRequest(_apiPath, Method.POST);
-            string sig = ComputeHmacSha384(_secretKey, signature);
-
-            request.AddHeader("accept", "application/json");
-            request.AddHeader("bfx-nonce", nonce);
-            request.AddHeader("bfx-apikey", _publicKey);
-            request.AddHeader("bfx-signature", sig);
-            request.AddParameter("application/json", body, ParameterType.RequestBody);
-
-            IRestResponse response = client.Execute(request);
-
-            if (response == null)
-            {
-                return;
-            }
             try
             {
+                _rateGateCancelAllOrder.WaitToProceed();
+
+                string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
+
+                string _apiPath = "v2/auth/w/order/cancel/multi";
+                string body = $"{{\"all\":1}}";
+
+                string signature = $"/api/{_apiPath}{nonce}{body}";
+                var client = new RestClient(_baseUrl);
+                var request = new RestRequest(_apiPath, Method.POST);
+                string sig = ComputeHmacSha384(_secretKey, signature);
+
+                request.AddHeader("accept", "application/json");
+                request.AddHeader("bfx-nonce", nonce);
+                request.AddHeader("bfx-apikey", _publicKey);
+                request.AddHeader("bfx-signature", sig);
+                request.AddParameter("application/json", body, ParameterType.RequestBody);
+
+                IRestResponse response = client.Execute(request);
+
+                if (response == null)
+                {
+                    return;
+                }
+
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     List<object> responseJson = JsonConvert.DeserializeObject<List<object>>(response.Content);
@@ -2247,33 +2266,33 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         public void CancelOrder(Order order)
         {
-            _rateGateCancelOrder.WaitToProceed();
-
-            string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-            string _apiPath = "v2/auth/w/order/cancel";
-
-            if (order.State == OrderStateType.Cancel)
-            {
-                return;
-            }
-
-            string body = $"{{\"id\":{order.NumberMarket}}}";
-
-            string signature = $"/api/{_apiPath}{nonce}{body}";
-            var client = new RestClient(_baseUrl);
-            var request = new RestRequest(_apiPath, Method.POST);
-            string sig = ComputeHmacSha384(_secretKey, signature);
-
-            request.AddHeader("accept", "application/json");
-            request.AddHeader("bfx-nonce", nonce);
-            request.AddHeader("bfx-apikey", _publicKey);
-            request.AddHeader("bfx-signature", sig);
-            request.AddParameter("application/json", body, ParameterType.RequestBody);
-
-            IRestResponse response = client.Execute(request);
-
             try
             {
+                _rateGateCancelOrder.WaitToProceed();
+
+                string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
+                string _apiPath = "v2/auth/w/order/cancel";
+
+                if (order.State == OrderStateType.Cancel)
+                {
+                    return;
+                }
+
+                string body = $"{{\"id\":{order.NumberMarket}}}";
+
+                string signature = $"/api/{_apiPath}{nonce}{body}";
+                var client = new RestClient(_baseUrl);
+                var request = new RestRequest(_apiPath, Method.POST);
+                string sig = ComputeHmacSha384(_secretKey, signature);
+
+                request.AddHeader("accept", "application/json");
+                request.AddHeader("bfx-nonce", nonce);
+                request.AddHeader("bfx-apikey", _publicKey);
+                request.AddHeader("bfx-signature", sig);
+                request.AddParameter("application/json", body, ParameterType.RequestBody);
+
+                IRestResponse response = client.Execute(request);
+
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     string responseBody = response.Content;
@@ -2308,13 +2327,13 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         public void ChangeOrderPrice(Order order, decimal newPrice)
         {
-            _rateGateChangePriceOrder.WaitToProceed();
-
-            string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-            string price = newPrice.ToString().Replace(',', '.');
-
             try
             {
+                _rateGateChangePriceOrder.WaitToProceed();
+
+                string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
+                string price = newPrice.ToString().Replace(',', '.');
+
                 if (order.TypeOrder == OrderPriceType.Market)
                 {
                     SendLogMessage("Can't change price for  Order Market", LogMessageType.Error);
@@ -2381,26 +2400,27 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         public List<Order> GetAllActiveOrders()
         {
-            string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-
             List<Order> orders = new List<Order>();
-
-            string _apiPath = "v2/auth/r/orders";
-            string signature = $"/api/{_apiPath}{nonce}";
-
-            var client = new RestClient(_baseUrl);
-            var request = new RestRequest(_apiPath, Method.POST);
-            string sig = ComputeHmacSha384(_secretKey, signature);
-
-            request.AddHeader("accept", "application/json");
-            request.AddHeader("bfx-nonce", nonce);
-            request.AddHeader("bfx-apikey", _publicKey);
-            request.AddHeader("bfx-signature", sig);
-
-            IRestResponse response = client.Execute(request);
 
             try
             {
+                _rateGateOrder.WaitToProceed();
+
+                string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
+                string _apiPath = "v2/auth/r/orders";
+                string signature = $"/api/{_apiPath}{nonce}";
+
+                var client = new RestClient(_baseUrl);
+                var request = new RestRequest(_apiPath, Method.POST);
+                string sig = ComputeHmacSha384(_secretKey, signature);
+
+                request.AddHeader("accept", "application/json");
+                request.AddHeader("bfx-nonce", nonce);
+                request.AddHeader("bfx-apikey", _publicKey);
+                request.AddHeader("bfx-signature", sig);
+
+                IRestResponse response = client.Execute(request);
+
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     string responseBody = response.Content;// пустой массив
@@ -2594,38 +2614,39 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         private Order GetActiveOrder(string id)
         {
-            if (id == "")
-            {
-                return null;
-            }
-
-            long orderId = Convert.ToInt64(id);
-
-            string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-
             List<Order> orders = new List<Order>();
 
-            string body = $"{{\"id\":[{orderId}]}}";
-
-            string _apiPath = "v2/auth/r/orders";
-            string signature = $"/api/{_apiPath}{nonce}{body}";
-
-            var client = new RestClient(_baseUrl);
-            var request = new RestRequest(_apiPath, Method.POST);
-            string sig = ComputeHmacSha384(_secretKey, signature);
-
-            request.AddHeader("accept", "application/json");
-            request.AddHeader("bfx-nonce", nonce);
-            request.AddHeader("bfx-apikey", _publicKey);
-            request.AddHeader("bfx-signature", sig);
-            request.AddParameter("application/json", body, ParameterType.RequestBody);
-
-            IRestResponse response = client.Execute(request);
-
             Order activOrder = new Order();
-
             try
             {
+
+                if (id == "")
+                {
+                    return null;
+                }
+
+                long orderId = Convert.ToInt64(id);
+
+                string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
+
+
+                string body = $"{{\"id\":[{orderId}]}}";
+
+                string _apiPath = "v2/auth/r/orders";
+                string signature = $"/api/{_apiPath}{nonce}{body}";
+
+                var client = new RestClient(_baseUrl);
+                var request = new RestRequest(_apiPath, Method.POST);
+                string sig = ComputeHmacSha384(_secretKey, signature);
+
+                request.AddHeader("accept", "application/json");
+                request.AddHeader("bfx-nonce", nonce);
+                request.AddHeader("bfx-apikey", _publicKey);
+                request.AddHeader("bfx-signature", sig);
+                request.AddParameter("application/json", body, ParameterType.RequestBody);
+
+                IRestResponse response = client.Execute(request);
+
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     string responseBody = response.Content;// пустой массив
@@ -2826,26 +2847,26 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         public List<Order> GetHistoryOrders()
         {
-            string nonce = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-
-            string _apiPath = "v2/auth/r/orders/hist";
-            string signature = $"/api/{_apiPath}{nonce}";
-
-            var client = new RestClient(_baseUrl);
-            var request = new RestRequest(_apiPath, Method.POST);
-            string sig = ComputeHmacSha384(_secretKey, signature);
-
-            request.AddHeader("accept", "application/json");
-            request.AddHeader("bfx-nonce", nonce);
-            request.AddHeader("bfx-apikey", _publicKey);
-            request.AddHeader("bfx-signature", sig);
-
-            IRestResponse response = client.Execute(request);
-
             List<Order> ordersHistory = new List<Order>();
 
             try
             {
+                string nonce = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+
+                string _apiPath = "v2/auth/r/orders/hist";
+                string signature = $"/api/{_apiPath}{nonce}";
+
+                var client = new RestClient(_baseUrl);
+                var request = new RestRequest(_apiPath, Method.POST);
+                string sig = ComputeHmacSha384(_secretKey, signature);
+
+                request.AddHeader("accept", "application/json");
+                request.AddHeader("bfx-nonce", nonce);
+                request.AddHeader("bfx-apikey", _publicKey);
+                request.AddHeader("bfx-signature", sig);
+
+                IRestResponse response = client.Execute(request);
+
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     var data = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
