@@ -8,7 +8,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Timers;
-using Com.Lmax.Api.Internal;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OsEngine.Entity;
@@ -141,7 +140,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         #endregion
 
         #region 2 Properties 
-
         public List<IServerParameter> ServerParameters { get; set; }
         public ServerConnectStatus ServerStatus { get; set; }
 
@@ -157,12 +155,9 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         private RateGate _rateGateSecurity = new RateGate(30, TimeSpan.FromMinutes(1));
 
-        private RateGate _rateGateTrades = new RateGate(15, TimeSpan.FromMinutes(1));
-
         private List<Security> _securities = new List<Security>();
 
         public event Action<List<Security>> SecurityEvent;
-
         public void GetSecurities()
         {
             try
@@ -353,7 +348,6 @@ namespace OsEngine.Market.Servers.Bitfinex
         public event Action<List<Portfolio>> PortfolioEvent;
 
         private RateGate _rateGatePortfolio = new RateGate(90, TimeSpan.FromMinutes(1));
-
         public void GetPortfolios()
         {
             CreateQueryPortfolio();
@@ -504,7 +498,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #endregion
 
-        #region 5 Data Candles
+        #region 5 Data
 
         private RateGate _rateGateCandleHistory = new RateGate(30, TimeSpan.FromMinutes(1));
         public List<Trade> GetTickDataToSecurity(Security security, DateTime startTime, DateTime endTime, DateTime actualTime)
@@ -513,7 +507,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             int limit = 10000;
 
-            List<Trade> lastTrades = BitfinexGetTrades(security.Name, limit, startTime, endTime);
+            List<Trade> lastTrades = GetTrades(security.Name, limit, startTime, endTime);
 
             if (lastTrades == null || lastTrades.Count == 0)
             {
@@ -534,7 +528,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             while (curEnd > startTime)
             {
-                List<Trade> newTrades = BitfinexGetTrades(security.Name, limit, startTime, endTime);
+                List<Trade> newTrades = GetTrades(security.Name, limit, startTime, endTime);
 
                 if (newTrades == null || newTrades.Count == 0)
                 {
@@ -556,7 +550,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             return trades;
         }
-        private List<Trade> BitfinexGetTrades(string security, int count, DateTime startTime, DateTime endTime)
+        private List<Trade> GetTrades(string security, int count, DateTime startTime, DateTime endTime)
         {
             try
             {
@@ -1004,6 +998,18 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #region  6 WebSocket creation
 
+        private string _webSocketPublicUrl = "wss://api-pub.bitfinex.com/ws/2";
+
+        private string _webSocketPrivateUrl = "wss://api.bitfinex.com/ws/2";
+
+        private Timer _pingTimer;
+
+        private bool _publicSocketActive = false;
+
+        private bool _privateSocketActive = false;
+
+        private string _lockerCheckActivateionSockets = "lockerCheckActivateionSockets";
+
         private WebSocket _webSocketPublic;
 
         private WebSocket _webSocketPrivate;
@@ -1011,14 +1017,11 @@ namespace OsEngine.Market.Servers.Bitfinex
         private ConcurrentQueue<string> _webSocketPublicMessage = new ConcurrentQueue<string>();
 
         private ConcurrentQueue<string> _webSocketPrivateMessage = new ConcurrentQueue<string>();
-
-        private string _webSocketPublicUrl = "wss://api-pub.bitfinex.com/ws/2";
-
-        private string _webSocketPrivateUrl = "wss://api.bitfinex.com/ws/2";
-
-        private Timer _pingTimer;
         private void CreateWebSocketConnection()
         {
+            _publicSocketActive = false;
+            _privateSocketActive = false;
+
             try
             {
                 if (_webSocketPublic != null)
@@ -1063,6 +1066,11 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 if (_webSocketPublic != null)
                 {
+                    _webSocketPublic.Opened -= WebSocketPublic_Opened;
+                    _webSocketPublic.Closed -= WebSocketPublic_Closed;
+                    _webSocketPublic.MessageReceived -= WebSocketPublic_MessageReceived;
+                    _webSocketPublic.Error -= WebSocketPublic_Error;
+
                     try
                     {
                         _webSocketPublic.Close();
@@ -1072,15 +1080,16 @@ namespace OsEngine.Market.Servers.Bitfinex
                         SendLogMessage(exception.ToString(), LogMessageType.System);
                     }
 
-                    _webSocketPublic.Opened -= WebSocketPublic_Opened;
-                    _webSocketPublic.Closed -= WebSocketPublic_Closed;
-                    _webSocketPublic.MessageReceived -= WebSocketPublic_MessageReceived;
-                    _webSocketPublic.Error -= WebSocketPublic_Error;
                     _webSocketPublic = null;
                 }
 
                 if (_webSocketPrivate != null)
                 {
+                    _webSocketPrivate.Opened -= WebSocketPrivate_Opened;
+                    _webSocketPrivate.Closed -= WebSocketPrivate_Closed;
+                    _webSocketPrivate.MessageReceived -= WebSocketPrivate_MessageReceived;
+                    _webSocketPrivate.Error -= WebSocketPrivate_Error;
+
                     try
                     {
                         _webSocketPrivate.Close();
@@ -1090,10 +1099,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                         SendLogMessage(exception.ToString(), LogMessageType.System);
                     }
 
-                    _webSocketPrivate.Opened -= WebSocketPrivate_Opened;
-                    _webSocketPrivate.Closed -= WebSocketPrivate_Closed;
-                    _webSocketPrivate.MessageReceived -= WebSocketPrivate_MessageReceived;
-                    _webSocketPrivate.Error -= WebSocketPrivate_Error;
                     _webSocketPrivate = null;
                 }
             }
@@ -1110,24 +1115,17 @@ namespace OsEngine.Market.Servers.Bitfinex
         //  private bool _socketPublicIsActive;
 
         //  private bool _socketPrivateIsActive;
-        private void SendPing(object sender, ElapsedEventArgs e)
-        {
-            try
-            {
-                if (_webSocketPublic != null && _webSocketPublic.State == WebSocketState.Open)
-                {
-                    string pingMessage = "{\"event\":\"ping\", \"cid\":1234}";
-                    _webSocketPublic.Send(pingMessage);
-                }
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage(exception.ToString(), LogMessageType.Error);
-            }
-        }
+
+        public event Action<MarketDepth> MarketDepthEvent;
+
+        private DateTime _lastTimeMd = DateTime.MinValue;
+
+        private List<MarketDepth> _marketDepths = new List<MarketDepth>();
         private void WebSocketPublic_Opened(object sender, EventArgs e)
         {
             Thread.Sleep(2000);
+
+            _publicSocketActive = true;
 
             try
             {
@@ -1225,22 +1223,162 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-
-        public event Action<MarketDepth> MarketDepthEvent;
-        private string GetSymbolByKeyInDepth(int channelId)
+        private void WebSocketPrivate_Opened(object sender, EventArgs e)
         {
-            string symbol = "";
 
-            if (_depthDictionary.TryGetValue(channelId, out symbol))
+            _privateSocketActive = true;
+
+            try
             {
-                return symbol;
+                GenerateAuthenticate();
+
+                CheckActivationSockets();
+
+                SendLogMessage("Connection to private data is Open", LogMessageType.System);
+
+                // Настраиваем таймер для отправки пинга каждые 30 секунд
+                _pingTimer = new Timer(30000); // 30 секунд
+                _pingTimer.Elapsed += SendPing;
+                _pingTimer.AutoReset = true;
+                _pingTimer.Start();
             }
-            return null;
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
+
         }
+        private void WebSocketPrivate_Closed(object sender, EventArgs e)
+        {
+            try
+            {
+                if (ServerStatus != ServerConnectStatus.Disconnect)
+                {
+                    ServerStatus = ServerConnectStatus.Disconnect;
+                    DisconnectEvent();
+                }
+                if (_pingTimer != null)
+                {
+                    _pingTimer.Stop();  // Останавливаем таймер
+                    _pingTimer.Elapsed -= SendPing;  // Отписываемся от события Elapsed
+                    _pingTimer = null;  // Очищаем таймер
+                }
+            }
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
 
-        private DateTime _lastTimeMd = DateTime.MinValue;
+            SendLogMessage("Connection Closed by Bitfinex. WebSocket Private сlosed ", LogMessageType.Error);
+        }
+        private void WebSocketPrivate_Error(object sender, ErrorEventArgs e)
+        {
+            try
+            {
+                if (e.Exception != null)
+                {
+                    SendLogMessage(e.Exception.ToString(), LogMessageType.Error);
+                }
+            }
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
+        }
+        private void WebSocketPrivate_MessageReceived(object sender, MessageReceivedEventArgs e)
+        {
+            try
+            {
+                if (ServerStatus == ServerConnectStatus.Disconnect)
+                {
+                    return;
+                }
 
-        private List<MarketDepth> _marketDepths = new List<MarketDepth>();
+                if (e == null || string.IsNullOrEmpty(e.Message))
+                {
+                    return;
+                }
+
+                if (_webSocketPrivateMessage == null)
+                {
+                    return;
+                }
+
+                _webSocketPrivateMessage.Enqueue(e.Message);
+            }
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
+        }
+        private void GenerateAuthenticate()
+        {
+            try
+            {
+                string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
+                string authPayload = "AUTH" + nonce;
+                string authSig;
+                using (var hmac = new HMACSHA384(Encoding.UTF8.GetBytes(_secretKey)))
+                {
+                    byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(authPayload));
+                    authSig = BitConverter.ToString(hash).Replace("-", "").ToLower();
+                }
+
+                var payload = new
+                {
+                    @event = "auth",
+                    apiKey = _publicKey,
+                    authSig = authSig,
+                    authNonce = nonce,
+                    authPayload = authPayload
+                };
+                string authJson = JsonConvert.SerializeObject(payload);
+
+                _webSocketPrivate.Send(authJson);
+
+            }
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
+        }
+        private void CheckActivationSockets()
+        {
+            lock (_lockerCheckActivateionSockets)
+            {
+                if (_publicSocketActive == false)
+                {
+                    return;
+                }
+
+                if (_privateSocketActive == false)
+                {
+                    return;
+                }
+
+                try
+                {
+                    if (ServerStatus != ServerConnectStatus.Connect &&
+                        _webSocketPublic != null && _webSocketPrivate != null &&
+                        _webSocketPublic.State == WebSocketState.Open &&
+                        _webSocketPrivate.State == WebSocketState.Open)
+                    {
+                        ServerStatus = ServerConnectStatus.Connect;
+
+                        if (ConnectEvent != null)
+                        {
+                            ConnectEvent();
+                        }
+                    }
+
+                    SendLogMessage("All sockets activated.", LogMessageType.System);
+                }
+                catch (Exception exception)
+                {
+                    SendLogMessage(exception.ToString(), LogMessageType.Error);
+                }
+            }
+        }
         private void SnapshotDepth(string message)
         {
             try
@@ -1480,134 +1618,15 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(error.ToString(), LogMessageType.Error);
             }
         }
-        private void WebSocketPrivate_Opened(object sender, EventArgs e)
+        private void SendPing(object sender, ElapsedEventArgs e)
         {
             try
             {
-                GenerateAuthenticate();
-
-                CheckActivationSockets();
-
-                SendLogMessage("Connection to private data is Open", LogMessageType.System);
-
-                // Настраиваем таймер для отправки пинга каждые 30 секунд
-                _pingTimer = new Timer(30000); // 30 секунд
-                _pingTimer.Elapsed += SendPing;
-                _pingTimer.AutoReset = true;
-                _pingTimer.Start();
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage(exception.ToString(), LogMessageType.Error);
-            }
-
-        }
-        private void GenerateAuthenticate()
-        {
-            try
-            {
-                string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-                string authPayload = "AUTH" + nonce;
-                string authSig;
-                using (var hmac = new HMACSHA384(Encoding.UTF8.GetBytes(_secretKey)))
+                if (_webSocketPublic != null && _webSocketPublic.State == WebSocketState.Open)
                 {
-                    byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(authPayload));
-                    authSig = BitConverter.ToString(hash).Replace("-", "").ToLower();
+                    string pingMessage = "{\"event\":\"ping\", \"cid\":1234}";
+                    _webSocketPublic.Send(pingMessage);
                 }
-
-                var payload = new
-                {
-                    @event = "auth",
-                    apiKey = _publicKey,
-                    authSig = authSig,
-                    authNonce = nonce,
-                    authPayload = authPayload
-                };
-                string authJson = JsonConvert.SerializeObject(payload);
-
-                _webSocketPrivate.Send(authJson);
-
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage(exception.ToString(), LogMessageType.Error);
-            }
-        }
-        private void CheckActivationSockets()
-        {
-            try
-            {
-                if (ServerStatus != ServerConnectStatus.Connect &&
-                    _webSocketPublic != null && _webSocketPrivate != null &&
-                    _webSocketPublic.State == WebSocketState.Open &&
-                    _webSocketPrivate.State == WebSocketState.Open)
-                {
-                    ServerStatus = ServerConnectStatus.Connect;
-                    ConnectEvent();
-                }
-
-                SendLogMessage("All sockets activated.", LogMessageType.System);
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage(exception.ToString(), LogMessageType.Error);
-            }
-        }
-        private void WebSocketPrivate_Closed(object sender, EventArgs e)
-        {
-            try
-            {
-                if (ServerStatus != ServerConnectStatus.Disconnect)
-                {
-                    ServerStatus = ServerConnectStatus.Disconnect;
-                    DisconnectEvent();
-                }
-                if (_pingTimer != null)
-                {
-                    _pingTimer.Stop();  // Останавливаем таймер
-                    _pingTimer.Elapsed -= SendPing;  // Отписываемся от события Elapsed
-                    _pingTimer = null;  // Очищаем таймер
-                }
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage(exception.ToString(), LogMessageType.Error);
-            }
-
-            SendLogMessage("Connection Closed by Bitfinex. WebSocket Private сlosed ", LogMessageType.Error);
-        }
-        private void WebSocketPrivate_Error(object sender, ErrorEventArgs e)
-        {
-            try
-            {
-                if (e.Exception != null)
-                {
-                    SendLogMessage(e.Exception.ToString(), LogMessageType.Error);
-                }
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage(exception.ToString(), LogMessageType.Error);
-            }
-        }
-        private void WebSocketPrivate_MessageReceived(object sender, MessageReceivedEventArgs e)
-        {
-            try
-            {
-                if (ServerStatus == ServerConnectStatus.Disconnect)
-                {
-                    return;
-                }
-                if (e == null || string.IsNullOrEmpty(e.Message))
-                {
-                    return;
-                }
-                if (_webSocketPrivateMessage == null)
-                {
-                    return;
-                }
-
-                _webSocketPrivateMessage.Enqueue(e.Message);
             }
             catch (Exception exception)
             {
@@ -1617,7 +1636,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         #endregion
 
-        #region  8 Security subscrible 
+        #region  8  WebSocket security subscrible
 
         private List<Security> _subscribledSecurities = new List<Security>();
         public void Subscrible(Security security)
@@ -1661,6 +1680,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
+
         #endregion
 
         #region  9 WebSocket parsing the messages
@@ -1670,14 +1690,16 @@ namespace OsEngine.Market.Servers.Bitfinex
         public event Action<MyTrade> MyTradeEvent;
 
         public event Action<Order> MyOrderEvent;
+       
+        private int _currentChannelIdDepth;
+
+        private int _channelIdTrade;
 
         private Dictionary<int, string> _tradeDictionary = new Dictionary<int, string>();
 
         private Dictionary<int, string> _depthDictionary = new Dictionary<int, string>();
 
-        private int _currentChannelIdDepth;
-
-        private int _channelIdTrade;
+        private Dictionary<string, int> _decimalVolume = new Dictionary<string, int>();
         private void PublicMessageReader()
         {
             while (true)
@@ -1823,16 +1845,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
             }
         }
-        private string GetSymbolByKeyInTrades(int channelId)
-        {
-            string symbol = "";
-
-            if (_tradeDictionary.TryGetValue(channelId, out symbol))
-            {
-                return symbol;
-            }
-            return null;
-        }
         private void UpdateTrade(string message)
         {
             if (message.Contains("tu"))
@@ -1918,10 +1930,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 // Расчет объема с учетом комиссии
                 decimal preVolume = volume + Math.Abs((tradeData[9]).ToString().ToDecimal());
 
-                //decimal preVolume = myTrade.Side == Side.Sell
-                //    ? Convert.ToDecimal(tradeData[4])
-                //    : Convert.ToDecimal(tradeData[4]) + Math.Abs(Convert.ToDecimal(tradeData[9]));
-
                 myTrade.Volume = GetVolumeForMyTrade(myTrade.SecurityNameCode, preVolume);
 
                 MyTradeEvent?.Invoke(myTrade);
@@ -1932,33 +1940,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
-        }
-
-        private Dictionary<string, int> _decimalVolume = new Dictionary<string, int>();
-        private decimal GetVolumeForMyTrade(string symbol, decimal preVolume)
-        {
-            int forTruncate = 1;
-
-            Dictionary<string, int>.Enumerator enumerator = _decimalVolume.GetEnumerator();
-
-            while (enumerator.MoveNext())
-            {
-                string key = enumerator.Current.Key;
-                int value = enumerator.Current.Value;
-
-                if (key.Equals(symbol))
-                {
-                    if (value != 0)
-                    {
-                        for (int i = 0; i < value; i++)
-                        {
-                            forTruncate *= 10;
-                        }
-                    }
-                    return Math.Truncate(preVolume * forTruncate) / forTruncate;
-                }
-            }
-            return preVolume;
         }
         private void UpdateOrder(string message)
         {
@@ -2002,6 +1983,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 updateOrder.Price = (orderDataList[16]).ToString().ToDecimal(); // PRICE
                 updateOrder.ServerType = ServerType.Bitfinex;
                 decimal volume = (orderDataList[7]).ToString().ToDecimal();
+
                 if (volume < 0)
                 {
                     volume = Math.Abs(volume);
@@ -2009,7 +1991,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 updateOrder.VolumeExecute = volume;// AMOUNT
                 updateOrder.Volume = volume;
                 updateOrder.PortfolioNumber = "BitfinexPortfolio";
-
 
                 if (updateOrder.State == OrderStateType.Done || updateOrder.State == OrderStateType.Partial)
                 {
@@ -2037,7 +2018,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                     updateOrder.State = OrderStateType.Cancel;
 
                     SendLogMessage($"Order canceled Successfully. Order ID:{updateOrder.NumberMarket}", LogMessageType.Trade);
-
                 }
 
                 MyOrderEvent?.Invoke(updateOrder);
@@ -2047,27 +2027,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-        private OrderStateType GetOrderState(string orderStateResponse)
-        {
-            if (orderStateResponse.StartsWith("ACTIVE"))
-            {
-                return OrderStateType.Active;
-            }
-            else if (orderStateResponse.StartsWith("EXECUTED"))
-            {
-                return OrderStateType.Done;
-            }
-            else if (orderStateResponse.StartsWith("PARTIALLY FILLED"))
-            {
-                return OrderStateType.Partial;
-            }
-            else if (orderStateResponse.StartsWith("CANCELED"))
-            {
-                return OrderStateType.Cancel;
-            }
-
-            return OrderStateType.None;
-        }
 
         #endregion
 
@@ -2075,11 +2034,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         private RateGate _rateGateOrder = new RateGate(90, TimeSpan.FromMinutes(1));
 
-        private RateGate _rateGateCancelOrder = new RateGate(90, TimeSpan.FromMinutes(1));
-
-        private RateGate _rateGateCancelAllOrder = new RateGate(90, TimeSpan.FromMinutes(1));
-
-        private RateGate _rateGateChangePriceOrder = new RateGate(90, TimeSpan.FromMinutes(1));
+        private RateGate _rateGateTrades = new RateGate(15, TimeSpan.FromMinutes(1));
         public void SendOrder(Order order)
         {
             try
@@ -2134,6 +2089,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 request.AddParameter("application/json", body, ParameterType.RequestBody);
 
                 var response = client.Execute(request);
+
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     string responseBody = response.Content;
@@ -2146,6 +2102,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     }
 
                     string dataJson = responseArray[4].ToString();
+
                     List<List<object>> ordersArray = JsonConvert.DeserializeObject<List<List<object>>>(dataJson);
 
                     if (ordersArray == null)
@@ -2168,7 +2125,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newOsOrder.NumberUser = Convert.ToInt32(orders[2]);
                         newOsOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orders[4]));
                         newOsOrder.State = GetOrderState(orders[13].ToString());
-                        //newOsOrder.State = OrderStateType.Active;
                         newOsOrder.SecurityClassCode = orders[3].ToString().StartsWith("f") ? "Futures" : "CurrencyPair";
                         newOsOrder.Side = (orders[6]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell;
                         newOsOrder.ServerType = ServerType.Bitfinex;
@@ -2184,6 +2140,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         SendLogMessage($"Order number {newOsOrder.NumberMarket} on exchange.", LogMessageType.Trade);
 
                         string typeOrder = (orders[8]).ToString();
+
                         if (typeOrder == "EXCHANGE LIMIT")
                         {
                             newOsOrder.TypeOrder = OrderPriceType.Limit;
@@ -2198,29 +2155,23 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
                 else
                 {
-                    CreateOrderFail(order);
                     SendLogMessage($"Error Order exception {response.Content}", LogMessageType.Error);
+                    order.State = OrderStateType.Fail;
+                    MyOrderEvent?.Invoke(order);
                 }
             }
             catch (Exception exception)
             {
-                CreateOrderFail(order);
                 SendLogMessage("Order send exception " + exception.ToString(), LogMessageType.Error);
             }
-        }
-        private void CreateOrderFail(Order order)
-        {
-            order.State = OrderStateType.Fail;
-            MyOrderEvent?.Invoke(order);
         }
         public void CancelAllOrders()
         {
             try
             {
-                _rateGateCancelAllOrder.WaitToProceed();
+                _rateGateOrder.WaitToProceed();
 
                 string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-
                 string _apiPath = "v2/auth/w/order/cancel/multi";
                 string body = $"{{\"all\":1}}";
 
@@ -2268,7 +2219,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             try
             {
-                _rateGateCancelOrder.WaitToProceed();
+                _rateGateOrder.WaitToProceed();
 
                 string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
                 string _apiPath = "v2/auth/w/order/cancel";
@@ -2309,29 +2260,25 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
                 else
                 {
-                    CreateOrderFail(order);
+                    order.State = OrderStateType.Fail;
+                    MyOrderEvent?.Invoke(order);
                     SendLogMessage($" Error Order cancellation:  {response.Content}, {response.ErrorMessage}", LogMessageType.Error);
                 }
             }
             catch (Exception exception)
             {
-                CreateOrderFail(order);
+
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-        private string ComputeHmacSha384(string apiSecret, string signature)
-        {
-            using HMACSHA384 hmac = new HMACSHA384(Encoding.UTF8.GetBytes(apiSecret));
-            byte[] output = hmac.ComputeHash(Encoding.UTF8.GetBytes(signature));
-            return BitConverter.ToString(output).Replace("-", "").ToLower();
-        }
         public void ChangeOrderPrice(Order order, decimal newPrice)
         {
+            _rateGateOrder.WaitToProceed();
+
             try
             {
-                _rateGateChangePriceOrder.WaitToProceed();
-
                 string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
+
                 string price = newPrice.ToString().Replace(',', '.');
 
                 if (order.TypeOrder == OrderPriceType.Market)
@@ -2371,13 +2318,15 @@ namespace OsEngine.Market.Servers.Bitfinex
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     string responseBody = response.Content;
+
                     var responseArray = JsonConvert.DeserializeObject<List<object>>(responseBody);
                     var orderDataArray = JsonConvert.DeserializeObject<List<object>>(responseArray[4].ToString());
+
                     order.Price = orderDataArray[16].ToString().ToDecimal();
-                    order.State = GetOrderState(orderDataArray[13].ToString()); // раскоментировать
+                    order.State = GetOrderState(orderDataArray[13].ToString()); 
 
                     SendLogMessage("Order change price. New price: " + order.Price
-                      + "  " + order.SecurityNameCode, LogMessageType.Trade);//LogMessageType.System
+                      + "  " + order.SecurityNameCode, LogMessageType.Trade);
                 }
                 else
                 {
@@ -2390,10 +2339,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-
-        #endregion
-
-        #region  11 Queries
         public void CancelAllOrdersToSecurity(Security security)
         {
             throw new NotImplementedException();
@@ -2449,6 +2394,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         activOrder.Side = (orderData[7]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell; // SIDE     orderData[6].Equals("-") ? Side.Sell : Side.Buy;
                         activOrder.State = GetOrderState(orderData[13].ToString());
                         decimal volume = orderData[7].ToString().ToDecimal();
+
                         if (volume < 0)
                         {
                             volume = Math.Abs(volume);
@@ -2479,7 +2425,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             if (order == null || order.NumberUser == 0)
             {
-                SendLogMessage("Order or CID is null/zero.", LogMessageType.Error);
+                SendLogMessage("Order or NumberUser is null/zero.", LogMessageType.Error);
                 return;
             }
 
@@ -2505,11 +2451,11 @@ namespace OsEngine.Market.Servers.Bitfinex
             // order.NumberUser = findOrder1.ordersHistory[2];
             // List<Order> findOrder= findOrder1.
 
-
             try
             {
 
                 Order orderOnMarket = null;
+
                 List<Order> ordersHistory = GetHistoryOrders();
 
                 List<List<object>> orders = GetHistoryOrders1();
@@ -2545,6 +2491,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     myOrder.Side = orderData[7]?.ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell;
                     myOrder.State = GetOrderState(orderData[13]?.ToString());
                     string typeOrder = orderData[8].ToString();
+
                     if (typeOrder == "EXCHANGE LIMIT")
                     {
                         myOrder.TypeOrder = OrderPriceType.Limit;
@@ -2577,6 +2524,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     orderOnMarket.State = OrderStateType.Active;
                 }
+
                 if (orderOnMarket.State == OrderStateType.Cancel)
                 {
                     orderOnMarket.State = OrderStateType.Cancel;
@@ -2617,9 +2565,9 @@ namespace OsEngine.Market.Servers.Bitfinex
             List<Order> orders = new List<Order>();
 
             Order activOrder = new Order();
+
             try
             {
-
                 if (id == "")
                 {
                     return null;
@@ -2628,10 +2576,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 long orderId = Convert.ToInt64(id);
 
                 string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-
-
                 string body = $"{{\"id\":[{orderId}]}}";
-
                 string _apiPath = "v2/auth/r/orders";
                 string signature = $"/api/{_apiPath}{nonce}{body}";
 
@@ -2649,7 +2594,8 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
-                    string responseBody = response.Content;// пустой массив
+                    string responseBody = response.Content;
+
                     if (responseBody.Contains("[]"))
                     {
                         SendLogMessage("Don't have active orders", LogMessageType.Trade);
@@ -2852,7 +2798,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             try
             {
                 string nonce = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-
                 string _apiPath = "v2/auth/r/orders/hist";
                 string signature = $"/api/{_apiPath}{nonce}";
 
@@ -2895,6 +2840,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                                 myOrder.Side = orderData[7]?.ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell;
                                 myOrder.State = GetOrderState(orderData[13]?.ToString());
                                 string typeOrder = orderData[8].ToString();
+
                                 if (typeOrder == "EXCHANGE LIMIT")
                                 {
                                     myOrder.TypeOrder = OrderPriceType.Limit;
@@ -2950,7 +2896,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             try
             {
                 string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-
                 string _apiPath = $"v2/auth/r/order/{symbol}:{orderId}/trades";
                 string signature = $"/api/{_apiPath}{nonce}";
 
@@ -2990,7 +2935,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         {
                             volume = Math.Abs(volume);
                         }
-                        /*555 */
+                       
                         decimal preVolume = volume + Math.Abs(Convert.ToDecimal(tradeData[9]));// посмотреть как считается комиссия
 
                         myTrade.Volume = GetVolumeForMyTrade(myTrade.SecurityNameCode, preVolume);
@@ -3019,6 +2964,82 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
 
             return trades;
+        }
+        private OrderStateType GetOrderState(string orderStateResponse)
+        {
+            if (orderStateResponse.StartsWith("ACTIVE"))
+            {
+                return OrderStateType.Active;
+            }
+            else if (orderStateResponse.StartsWith("EXECUTED"))
+            {
+                return OrderStateType.Done;
+            }
+            else if (orderStateResponse.StartsWith("PARTIALLY FILLED"))
+            {
+                return OrderStateType.Partial;
+            }
+            else if (orderStateResponse.StartsWith("CANCELED"))
+            {
+                return OrderStateType.Cancel;
+            }
+
+            return OrderStateType.None;
+        }
+        private decimal GetVolumeForMyTrade(string symbol, decimal preVolume)
+        {
+            int forTruncate = 1;
+
+            Dictionary<string, int>.Enumerator enumerator = _decimalVolume.GetEnumerator();
+
+            while (enumerator.MoveNext())
+            {
+                string key = enumerator.Current.Key;
+                int value = enumerator.Current.Value;
+
+                if (key.Equals(symbol))
+                {
+                    if (value != 0)
+                    {
+                        for (int i = 0; i < value; i++)
+                        {
+                            forTruncate *= 10;
+                        }
+                    }
+                    return Math.Truncate(preVolume * forTruncate) / forTruncate;
+                }
+            }
+            return preVolume;
+        }
+        private string GetSymbolByKeyInTrades(int channelId)
+        {
+            string symbol = "";
+
+            if (_tradeDictionary.TryGetValue(channelId, out symbol))
+            {
+                return symbol;
+            }
+            return null;
+        }
+        private string GetSymbolByKeyInDepth(int channelId)
+        {
+            string symbol = "";
+
+            if (_depthDictionary.TryGetValue(channelId, out symbol))
+            {
+                return symbol;
+            }
+            return null;
+        }
+
+        #endregion
+
+        #region  11 Generate Signature
+        private string ComputeHmacSha384(string apiSecret, string signature)
+        {
+            using HMACSHA384 hmac = new HMACSHA384(Encoding.UTF8.GetBytes(apiSecret));
+            byte[] output = hmac.ComputeHash(Encoding.UTF8.GetBytes(signature));
+            return BitConverter.ToString(output).Replace("-", "").ToLower();
         }
 
         #endregion
