@@ -132,7 +132,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage("Connection closed by Bitfinex. WebSocket Data Closed Event" + exception.ToString(), LogMessageType.System);
             }
         }
-        public ServerType ServerType => ServerType.Bitfinex;
+        public ServerType ServerType
+        {
+            get { return ServerType.Bitfinex; }
+        }
 
         public event Action ConnectEvent;
 
@@ -2798,6 +2801,8 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         public List<Order> GetHistoryOrders()
         {
+            _rateGateOrder.WaitToProceed();
+
             List<Order> ordersHistory = new List<Order>();
 
             try
