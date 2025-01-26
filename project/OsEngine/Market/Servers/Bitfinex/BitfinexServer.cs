@@ -111,6 +111,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 _securities.Clear();
                 _portfolios.Clear();
+                _subscribledSecurities.Clear();
                 //marketDepth.Bids.Clear();
                 //marketDepth.Asks.Clear();
                 //tradeDictionary.Clear();///////////
@@ -1116,9 +1117,9 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         //  private bool _socketPrivateIsActive;
 
-        public event Action<MarketDepth> MarketDepthEvent;
-
         private DateTime _lastTimeMd = DateTime.MinValue;
+
+        public event Action<MarketDepth> MarketDepthEvent;
 
         private List<MarketDepth> _marketDepths = new List<MarketDepth>();
         private void WebSocketPublic_Opened(object sender, EventArgs e)
@@ -1379,6 +1380,237 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
             }
         }
+        private void SendPing(object sender, ElapsedEventArgs e)
+        {
+            try
+            {
+                if (_webSocketPublic != null && _webSocketPublic.State == WebSocketState.Open)
+                {
+                    string pingMessage = "{\"event\":\"ping\", \"cid\":1234}";
+                    _webSocketPublic.Send(pingMessage);
+                }
+            }
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
+        }
+
+        #endregion
+
+        #region  8  WebSocket security subscrible
+
+        private List<Security> _subscribledSecurities = new List<Security>();
+        public void Subscrible(Security security)
+        {
+            try
+            {
+                CreateSubscribleMessageWebSocket(security);
+
+                Thread.Sleep(200);
+            }
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
+        }
+        private void CreateSubscribleMessageWebSocket(Security security)
+        {
+            try
+            {
+                if (ServerStatus == ServerConnectStatus.Disconnect)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < _subscribledSecurities.Count; i++)
+                {
+                    if (_subscribledSecurities[i].Name == security.Name &&
+                        _subscribledSecurities[i].NameClass == security.NameClass)
+                    {
+                        return;
+                    }
+                }
+
+                _subscribledSecurities.Add(security);
+
+                _webSocketPublic.Send($"{{\"event\":\"subscribe\",\"channel\":\"book\",\"symbol\":\"{security.Name}\",\"prec\":\"P0\",\"freq\":\"F0\",\"len\":\"25\"}}");
+                _webSocketPublic.Send($"{{\"event\":\"subscribe\",\"channel\":\"trades\",\"symbol\":\"{security.Name}\"}}");
+            }
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.ToString(), LogMessageType.Error);
+            }
+        }
+
+        #endregion
+
+        #region  9 WebSocket parsing the messages
+
+        private int _currentChannelIdDepth;
+
+        private int _channelIdTrade;
+
+        public event Action<Trade> NewTradesEvent;
+
+        public event Action<MyTrade> MyTradeEvent;
+
+        public event Action<Order> MyOrderEvent;
+
+        private Dictionary<int, string> _tradeDictionary = new Dictionary<int, string>();
+
+        private Dictionary<int, string> _depthDictionary = new Dictionary<int, string>();
+
+        private Dictionary<string, int> _decimalVolume = new Dictionary<string, int>();
+        private void PublicMessageReader()
+        {
+            while (true)
+            {
+                try
+                {
+                    if (ServerStatus == ServerConnectStatus.Disconnect)
+                    {
+                        Thread.Sleep(2000);
+                        continue;
+                    }
+
+                    if (_webSocketPublicMessage.IsEmpty)
+                    {
+                        Thread.Sleep(1);
+                        continue;
+                    }
+
+                    _webSocketPublicMessage.TryDequeue(out string message);
+
+                    if (message == null)
+                    {
+                        continue;
+                    }
+
+                    else if (message.Contains("event") || message.Contains("hb") || message.Contains("auth"))
+                    {
+                        //continue;
+                    }
+
+                    if (message.Contains("trades"))
+                    {
+                        BitfinexSubscriptionResponse responseTrade = JsonConvert.DeserializeObject<BitfinexSubscriptionResponse>(message);
+
+                        _tradeDictionary.Add(Convert.ToInt32(responseTrade.ChanId), responseTrade.Symbol);
+                        _channelIdTrade = Convert.ToInt32(responseTrade.ChanId);
+                    }
+
+                    else if (message.Contains("book"))
+                    {
+                        BitfinexSubscriptionResponse responseDepth = JsonConvert.DeserializeObject<BitfinexSubscriptionResponse>(message);
+
+                        _depthDictionary.Add(Convert.ToInt32(responseDepth.ChanId), responseDepth.Symbol);
+                        _currentChannelIdDepth = Convert.ToInt32(responseDepth.ChanId);
+                    }
+
+                    if (message.Contains("[["))
+                    {
+                        var root = JsonConvert.DeserializeObject<List<object>>(message);
+
+                        int channelId = Convert.ToInt32(root[0]);
+
+                        if (root == null || root.Count < 2)
+                        {
+                            SendLogMessage("Incorrect message format: insufficient elements.", LogMessageType.Error);
+                            return;
+                        }
+                        if (channelId == _currentChannelIdDepth)
+                        {
+                            SnapshotDepth(message);
+                        }
+                    }
+
+                    if (!message.Contains("[[") && !message.Contains("te") && !message.Contains("tu") && !message.Contains("ws") && !message.Contains("event") && !message.Contains("hb"))
+                    {
+                        UpdateDepth(message);
+                    }
+
+                    if ((message.Contains("te") || message.Contains("tu")) && _channelIdTrade != 0)
+                    {
+                        UpdateTrade(message);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Thread.Sleep(5000);
+                    SendLogMessage(exception.ToString(), LogMessageType.Error);
+                }
+            }
+        }
+        private void PrivateMessageReader()
+        {
+            while (true)
+            {
+                try
+                {
+                    if (ServerStatus == ServerConnectStatus.Disconnect)
+                    {
+                        Thread.Sleep(2000);
+                        continue;
+                    }
+
+                    if (_webSocketPrivateMessage.IsEmpty)
+                    {
+                        Thread.Sleep(1);
+                        continue;
+                    }
+
+                    _webSocketPrivateMessage.TryDequeue(out string message);
+
+                    if (message == null)
+                    {
+                        continue;
+                    }
+
+                    if (message.Contains("\"event\":\"info\""))
+                    {
+                        SendLogMessage("WebSocket opened", LogMessageType.System);
+                    }
+
+                    if (message.Contains("\"event\":\"auth\""))
+                    {
+                        var authResponse = JsonConvert.DeserializeObject<BitfinexAuthResponseWebSocket>(message);
+
+                        if (authResponse.Status == "OK")
+                        {
+                            SendLogMessage("WebSocket authentication successful", LogMessageType.System);
+                        }
+                        else
+                        {
+                            ServerStatus = ServerConnectStatus.Disconnect;
+                            DisconnectEvent();
+                            SendLogMessage($"WebSocket authentication error: Invalid public or secret key: {authResponse.Msg}", LogMessageType.Error);
+                        }
+                    }
+
+                    else if (message.StartsWith("[0,\"tu\",["))
+                    {
+                        UpdateMyTrade(message);
+                    }
+
+                    else if
+                       (message.StartsWith("[0,\"oc\",[") || message.StartsWith("[0,\"ou\",["))
+                    {
+                        UpdateOrder(message);
+                    }
+
+                    else if (message.StartsWith("[0,\"wu\",["))
+                    {
+                        UpdatePortfolio(message);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Thread.Sleep(5000);
+                    SendLogMessage(exception.ToString(), LogMessageType.Error);
+                }
+            }
+        }
         private void SnapshotDepth(string message)
         {
             try
@@ -1616,233 +1848,6 @@ namespace OsEngine.Market.Servers.Bitfinex
             catch (Exception error)
             {
                 SendLogMessage(error.ToString(), LogMessageType.Error);
-            }
-        }
-        private void SendPing(object sender, ElapsedEventArgs e)
-        {
-            try
-            {
-                if (_webSocketPublic != null && _webSocketPublic.State == WebSocketState.Open)
-                {
-                    string pingMessage = "{\"event\":\"ping\", \"cid\":1234}";
-                    _webSocketPublic.Send(pingMessage);
-                }
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage(exception.ToString(), LogMessageType.Error);
-            }
-        }
-
-        #endregion
-
-        #region  8  WebSocket security subscrible
-
-        private List<Security> _subscribledSecurities = new List<Security>();
-        public void Subscrible(Security security)
-        {
-            try
-            {
-                CreateSubscribleMessageWebSocket(security);
-
-                Thread.Sleep(200);
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage(exception.ToString(), LogMessageType.Error);
-            }
-        }
-        private void CreateSubscribleMessageWebSocket(Security security)
-        {
-            try
-            {
-                if (ServerStatus == ServerConnectStatus.Disconnect)
-                {
-                    return;
-                }
-
-                for (int i = 0; i < _subscribledSecurities.Count; i++)
-                {
-                    if (_subscribledSecurities[i].Name == security.Name &&
-                        _subscribledSecurities[i].NameClass == security.NameClass)
-                    {
-                        return;
-                    }
-                }
-
-                _subscribledSecurities.Add(security);
-
-                _webSocketPublic.Send($"{{\"event\":\"subscribe\",\"channel\":\"book\",\"symbol\":\"{security.Name}\",\"prec\":\"P0\",\"freq\":\"F0\",\"len\":\"25\"}}");
-                _webSocketPublic.Send($"{{\"event\":\"subscribe\",\"channel\":\"trades\",\"symbol\":\"{security.Name}\"}}");
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage(exception.ToString(), LogMessageType.Error);
-            }
-        }
-
-        #endregion
-
-        #region  9 WebSocket parsing the messages
-
-        public event Action<Trade> NewTradesEvent;
-
-        public event Action<MyTrade> MyTradeEvent;
-
-        public event Action<Order> MyOrderEvent;
-       
-        private int _currentChannelIdDepth;
-
-        private int _channelIdTrade;
-
-        private Dictionary<int, string> _tradeDictionary = new Dictionary<int, string>();
-
-        private Dictionary<int, string> _depthDictionary = new Dictionary<int, string>();
-
-        private Dictionary<string, int> _decimalVolume = new Dictionary<string, int>();
-        private void PublicMessageReader()
-        {
-            while (true)
-            {
-                try
-                {
-                    if (ServerStatus == ServerConnectStatus.Disconnect)
-                    {
-                        Thread.Sleep(2000);
-                        continue;
-                    }
-
-                    if (_webSocketPublicMessage.IsEmpty)
-                    {
-                        Thread.Sleep(1);
-                        continue;
-                    }
-
-                    _webSocketPublicMessage.TryDequeue(out string message);
-
-                    if (message == null)
-                    {
-                        continue;
-                    }
-
-                    else if (message.Contains("event") || message.Contains("hb") || message.Contains("auth"))
-                    {
-                        //continue;
-                    }
-
-                    if (message.Contains("trades"))
-                    {
-                        BitfinexSubscriptionResponse responseTrade = JsonConvert.DeserializeObject<BitfinexSubscriptionResponse>(message);
-                        _tradeDictionary.Add(Convert.ToInt32(responseTrade.ChanId), responseTrade.Symbol);
-                        _channelIdTrade = Convert.ToInt32(responseTrade.ChanId);
-                    }
-
-                    else if (message.Contains("book"))
-                    {
-                        BitfinexSubscriptionResponse responseDepth = JsonConvert.DeserializeObject<BitfinexSubscriptionResponse>(message);
-                        _depthDictionary.Add(Convert.ToInt32(responseDepth.ChanId), responseDepth.Symbol);
-                        _currentChannelIdDepth = Convert.ToInt32(responseDepth.ChanId);
-                    }
-
-                    if (message.Contains("[["))
-                    {
-                        var root = JsonConvert.DeserializeObject<List<object>>(message);
-                        int channelId = Convert.ToInt32(root[0]);
-                        if (root == null || root.Count < 2)
-                        {
-                            SendLogMessage("Incorrect message format: insufficient elements.", LogMessageType.Error);
-                            return;
-                        }
-                        if (channelId == _currentChannelIdDepth)
-                        {
-                            SnapshotDepth(message);
-                        }
-                    }
-
-                    if (!message.Contains("[[") && !message.Contains("te") && !message.Contains("tu") && !message.Contains("ws") && !message.Contains("event") && !message.Contains("hb"))
-                    {
-                        UpdateDepth(message);
-                    }
-
-                    if ((message.Contains("te") || message.Contains("tu")) && _channelIdTrade != 0)
-                    {
-                        UpdateTrade(message);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    Thread.Sleep(5000);
-                    SendLogMessage(exception.ToString(), LogMessageType.Error);
-                }
-            }
-        }
-        private void PrivateMessageReader()
-        {
-            while (true)
-            {
-                try
-                {
-                    if (ServerStatus == ServerConnectStatus.Disconnect)
-                    {
-                        Thread.Sleep(2000);
-                        continue;
-                    }
-
-                    if (_webSocketPrivateMessage.IsEmpty)
-                    {
-                        Thread.Sleep(1);
-                        continue;
-                    }
-
-                    _webSocketPrivateMessage.TryDequeue(out string message);
-
-                    if (message == null)
-                    {
-                        continue;
-                    }
-
-                    if (message.Contains("\"event\":\"info\""))
-                    {
-                        SendLogMessage("WebSocket opened", LogMessageType.System);
-                    }
-
-                    if (message.Contains("\"event\":\"auth\""))
-                    {
-                        var authResponse = JsonConvert.DeserializeObject<BitfinexAuthResponseWebSocket>(message);
-
-                        if (authResponse.Status == "OK")
-                        {
-                            SendLogMessage("WebSocket authentication successful", LogMessageType.System);
-                        }
-                        else
-                        {
-                            ServerStatus = ServerConnectStatus.Disconnect;
-                            DisconnectEvent();
-                            SendLogMessage($"WebSocket authentication error: Invalid public or secret key: {authResponse.Msg}", LogMessageType.Error);
-                        }
-                    }
-
-                    else if (message.StartsWith("[0,\"tu\",["))
-                    {
-                        UpdateMyTrade(message);
-                    }
-
-                    else if
-                       (message.StartsWith("[0,\"oc\",[") || message.StartsWith("[0,\"ou\",["))
-                    {
-                        UpdateOrder(message);
-                    }
-
-                    else if (message.StartsWith("[0,\"wu\",["))
-                    {
-                        UpdatePortfolio(message);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    Thread.Sleep(5000);
-                    SendLogMessage(exception.ToString(), LogMessageType.Error);
-                }
             }
         }
         private void UpdateTrade(string message)
