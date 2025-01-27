@@ -13,6 +13,7 @@ using Newtonsoft.Json.Linq;
 using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Logging;
+using OsEngine.Market.Servers.BingX.BingXFutures.Entity;
 using OsEngine.Market.Servers.Bitfinex.Json;
 using OsEngine.Market.Servers.Entity;
 using RestSharp;
@@ -2437,110 +2438,113 @@ namespace OsEngine.Market.Servers.Bitfinex
                 return;
             }
 
-            //List<Order> ordersactive = GetAllActiveOrders();
-            // Переменная для хранения ордера с рынка
-
-
-            //// Проверяем активные ордера
-            //if (activeOrdersByCid.TryGetValue(order.NumberUser, out var activeOrder))
-            //{
-            //    SendLogMessage($"Order found in active orders: {activeOrder.NumberMarket}{order.NumberUser}", LogMessageType.Trade);
-            //    orderOnMarket = activeOrder;
-            //}
-
-            // Получаем историю ордеров
-            //List<Order> ordersHistory = GetHistoryOrders();
-
-            //var  ordersHistory = GetHistoryOrders();
-            ////int o2 = (order.NumberUser);
-
-            //List<object> findOrder1 = ordersHistory.FirstOrDefault(o => Convert.ToInt32(ordersHistory[2]) == order.NumberUser);
-            //List<Order> orders = new List<Order>();
-            // order.NumberUser = findOrder1.ordersHistory[2];
-            // List<Order> findOrder= findOrder1.
-
             try
             {
-
-                Order orderOnMarket = null;
-
                 List<Order> ordersHistory = GetHistoryOrders();
 
-                List<List<object>> orders = GetHistoryOrders1();
-
-                if (orderOnMarket == null)
+                if (ordersHistory == null ||
+                ordersHistory.Count == 0)
                 {
                     SendLogMessage($"Failed to find order with numberUser.", LogMessageType.Error);
                     return;
                 }
 
-                // orderOnMarket = ordersHistory;
+                Order orderOnMarket = null;
 
-                if (orders == null)
+                for (int i = 0; i < ordersHistory.Count; i++)
                 {
-                    Console.WriteLine("Failed to retrieve order history.");
+                    Order currentOder = ordersHistory[i];
+
+                    if (order.NumberUser != 0
+                        && currentOder.NumberUser != 0
+                        && currentOder.NumberUser == order.NumberUser)
+                    {
+                        orderOnMarket = currentOder;
+                        break;
+                    }
+
+                    if (string.IsNullOrEmpty(order.NumberMarket) == false
+                        && order.NumberMarket == currentOder.NumberMarket)
+                    {
+                        orderOnMarket = currentOder;
+                        break;
+                    }
+                }
+
+                if (orderOnMarket == null)
+                {
                     return;
                 }
 
-                // Поиск ордера с указанным CID
-                var orderData = orders.FirstOrDefault(o => Convert.ToInt64(o[2]) == order.NumberUser);
-
-                if (orderData != null)
+                if (orderOnMarket != null &&
+                    MyOrderEvent != null)
                 {
-                    Order myOrder = new Order();
-
-                    myOrder.NumberUser = Convert.ToInt32(orderData[2]);
-                    myOrder.NumberMarket = orderData[0]?.ToString();
-                    myOrder.TimeCreate = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderData[5]));
-                    myOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderData[4]));
-                    myOrder.ServerType = ServerType.Bitfinex;
-                    myOrder.SecurityNameCode = orderData[3]?.ToString();
-                    myOrder.SecurityClassCode = myOrder.SecurityNameCode.StartsWith("f") ? "Futures" : "CurrencyPair";
-                    myOrder.Side = orderData[7]?.ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell;
-                    myOrder.State = GetOrderState(orderData[13]?.ToString());
-                    string typeOrder = orderData[8].ToString();
-
-                    if (typeOrder == "EXCHANGE LIMIT")
-                    {
-                        myOrder.TypeOrder = OrderPriceType.Limit;
-                    }
-                    else
-                    {
-                        myOrder.TypeOrder = OrderPriceType.Market;
-                    }
-
-                    decimal volume = orderData[7]?.ToString().ToDecimal() ?? 0;
-
-                    if (volume < 0)
-                    {
-                        volume = Math.Abs(volume);
-                    }
-
-                    myOrder.Price = orderData[16]?.ToString().ToDecimal() ?? 0;
-                    myOrder.PortfolioNumber = "BitfinexPortfolio";
-                    myOrder.VolumeExecute = volume;
-                    myOrder.Volume = volume;
-
-                    orderOnMarket = myOrder;
-                }
-                else
-                {
-                    Console.WriteLine("The order with NumberUser was not found.");
+                    MyOrderEvent(orderOnMarket);
                 }
 
-                if (orderOnMarket.State == OrderStateType.Active)
-                {
-                    orderOnMarket.State = OrderStateType.Active;
-                }
+
+                //if (orders == null)
+                //{
+                //    Console.WriteLine("Failed to retrieve order history.");
+                //    return;
+                //}
+
+                //// Поиск ордера с указанным CID
+                //var orderData = orders.FirstOrDefault(o => Convert.ToInt64(o[2]) == order.NumberUser);
+
+                //if (orderData != null)
+                //{
+                //    Order myOrder = new Order();
+
+                //    myOrder.NumberUser = Convert.ToInt32(orderData[2]);
+                //    myOrder.NumberMarket = orderData[0]?.ToString();
+                //    myOrder.TimeCreate = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderData[5]));
+                //    myOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderData[4]));
+                //    myOrder.ServerType = ServerType.Bitfinex;
+                //    myOrder.SecurityNameCode = orderData[3]?.ToString();
+                //    myOrder.SecurityClassCode = myOrder.SecurityNameCode.StartsWith("f") ? "Futures" : "CurrencyPair";
+                //    myOrder.Side = orderData[7]?.ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell;
+                //    myOrder.State = GetOrderState(orderData[13]?.ToString());
+                //    string typeOrder = orderData[8].ToString();
+
+                //    if (typeOrder == "EXCHANGE LIMIT")
+                //    {
+                //        myOrder.TypeOrder = OrderPriceType.Limit;
+                //    }
+                //    else
+                //    {
+                //        myOrder.TypeOrder = OrderPriceType.Market;
+                //    }
+
+                //    decimal volume = orderData[7]?.ToString().ToDecimal() ?? 0;
+
+                //    if (volume < 0)
+                //    {
+                //        volume = Math.Abs(volume);
+                //    }
+
+                //    myOrder.Price = orderData[16]?.ToString().ToDecimal() ?? 0;
+                //    myOrder.PortfolioNumber = "BitfinexPortfolio";
+                //    myOrder.VolumeExecute = volume;
+                //    myOrder.Volume = volume;
+
+                //    orderOnMarket = myOrder;
+                //}
+                //else
+                //{
+                //    Console.WriteLine("The order with NumberUser was not found.");
+                //}
+
 
                 if (orderOnMarket.State == OrderStateType.Cancel)
                 {
                     orderOnMarket.State = OrderStateType.Cancel;
                 }
 
-                if (orderOnMarket.State == OrderStateType.Done || orderOnMarket.State == OrderStateType.Partial)
+                if (orderOnMarket.State == OrderStateType.Done || 
+                    orderOnMarket.State == OrderStateType.Partial)
                 {
-                    List<MyTrade> tradesBySecurity = GetMyTradesBySecurity(orderOnMarket.SecurityNameCode, orderOnMarket.NumberMarket);//trades =""
+                    List<MyTrade> tradesBySecurity = GetMyTradesBySecurity(orderOnMarket.SecurityNameCode, orderOnMarket.NumberMarket);
 
                     if (tradesBySecurity != null)
                     {
@@ -2560,8 +2564,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                         }
                     }
                 }
-
-                MyOrderEvent?.Invoke(orderOnMarket);
             }
             catch (Exception exception)
             {
@@ -2677,11 +2679,10 @@ namespace OsEngine.Market.Servers.Bitfinex
             string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
             string _apiPath = "v2/auth/r/orders/hist";
 
-            // long orderId = 190717081154;
-            //if (orderId == "")
-            //{
-            //    return null;
-            //}
+            if (orderId == "")
+            {
+                return null;
+            }
 
             string body = $"{{\"id\":[{orderId}]}}";
 
@@ -2840,7 +2841,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                                 {
                                     myOrder.NumberUser = Convert.ToInt32(number);
                                 }
-                                //myOrder.NumberUser=Convert.ToInt32(orderData[2]);
+                               
                                 myOrder.NumberMarket = orderData[0]?.ToString();
                                 myOrder.TimeCreate = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderData[5]));
                                 myOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderData[4]));
