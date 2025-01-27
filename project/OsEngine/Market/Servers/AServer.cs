@@ -2701,7 +2701,7 @@ namespace OsEngine.Market.Servers
                 myOrder.TimeCreate = ServerTime;
             }
             if (myOrder.State == OrderStateType.Done &&
-                myOrder.TimeDone == DateTime.MinValue)
+                myOrder.TimeDone == DateTime.MinValue)/// не выполняется условие
             {
                 myOrder.TimeDone = myOrder.TimeCallBack;
             }
