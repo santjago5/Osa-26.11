@@ -16,7 +16,6 @@ using OsEngine.Logging;
 using OsEngine.Market.Servers.Bitfinex.Json;
 using OsEngine.Market.Servers.Entity;
 using RestSharp;
-using WebSocket4Net;
 using Candle = OsEngine.Entity.Candle;
 using ErrorEventArgs = SuperSocket.ClientEngine.ErrorEventArgs;
 using MarketDepth = OsEngine.Entity.MarketDepth;
@@ -26,8 +25,8 @@ using Security = OsEngine.Entity.Security;
 using Side = OsEngine.Entity.Side;
 using Timer = System.Timers.Timer;
 using Trade = OsEngine.Entity.Trade;
-using WebSocket = WebSocket4Net.WebSocket;
-using WebSocketState = WebSocket4Net.WebSocketState;
+using WebSocketSharp;
+
 
 
 
@@ -1020,6 +1019,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         private ConcurrentQueue<string> _webSocketPublicMessage = new ConcurrentQueue<string>();
 
         private ConcurrentQueue<string> _webSocketPrivateMessage = new ConcurrentQueue<string>();
+
         private void CreateWebSocketConnection()
         {
             _publicSocketActive = false;
@@ -1032,47 +1032,40 @@ namespace OsEngine.Market.Servers.Bitfinex
                     return;
                 }
 
-                _webSocketPublic = new WebSocket(_webSocketPublicUrl)
-                {
-                    EnableAutoSendPing = true,
-                    AutoSendPingInterval = 15
-                };
+                _webSocketPublic = new WebSocket(_webSocketPublicUrl);
 
-                _webSocketPublic.Opened += WebSocketPublic_Opened;
-                _webSocketPublic.Closed += WebSocketPublic_Closed;
-                _webSocketPublic.MessageReceived += WebSocketPublic_MessageReceived;
-                _webSocketPublic.Error += WebSocketPublic_Error;
+                _webSocketPublic.OnOpen += WebSocketPublic_Opened;
+                _webSocketPublic.OnClose += WebSocketPublic_Closed;
+                _webSocketPublic.OnMessage += WebSocketPublic_MessageReceived;
+                _webSocketPublic.OnError += WebSocketPublic_Error;
 
-                _webSocketPublic.Open();
+                _webSocketPublic.Connect();
 
-                _webSocketPrivate = new WebSocket(_webSocketPrivateUrl)
-                {
-                    EnableAutoSendPing = true,
-                    AutoSendPingInterval = 15
-                };
+                _webSocketPrivate = new WebSocket(_webSocketPrivateUrl);
 
-                _webSocketPrivate.Opened += WebSocketPrivate_Opened;
-                _webSocketPrivate.Closed += WebSocketPrivate_Closed;
-                _webSocketPrivate.MessageReceived += WebSocketPrivate_MessageReceived;
-                _webSocketPrivate.Error += WebSocketPrivate_Error;
+                _webSocketPrivate.OnOpen += WebSocketPrivate_Opened;
+                _webSocketPrivate.OnClose += WebSocketPrivate_Closed;
+                _webSocketPrivate.OnMessage += WebSocketPrivate_MessageReceived;
+                _webSocketPrivate.OnError += WebSocketPrivate_Error;
 
-                _webSocketPrivate.Open();
+                _webSocketPrivate.Connect();
             }
             catch (Exception exception)
             {
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
+
         private void DeleteWebSocketConnection()
         {
             try
             {
                 if (_webSocketPublic != null)
                 {
-                    _webSocketPublic.Opened -= WebSocketPublic_Opened;
-                    _webSocketPublic.Closed -= WebSocketPublic_Closed;
-                    _webSocketPublic.MessageReceived -= WebSocketPublic_MessageReceived;
-                    _webSocketPublic.Error -= WebSocketPublic_Error;
+                    _webSocketPublic.OnOpen -= WebSocketPublic_Opened;
+                    _webSocketPublic.OnClose -= WebSocketPublic_Closed;
+                    _webSocketPublic.OnMessage -= WebSocketPublic_MessageReceived;
+                    _webSocketPublic.OnError -= WebSocketPublic_Error;
 
                     try
                     {
@@ -1088,10 +1081,10 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 if (_webSocketPrivate != null)
                 {
-                    _webSocketPrivate.Opened -= WebSocketPrivate_Opened;
-                    _webSocketPrivate.Closed -= WebSocketPrivate_Closed;
-                    _webSocketPrivate.MessageReceived -= WebSocketPrivate_MessageReceived;
-                    _webSocketPrivate.Error -= WebSocketPrivate_Error;
+                    _webSocketPrivate.OnOpen -= WebSocketPrivate_Opened;
+                    _webSocketPrivate.OnClose -= WebSocketPrivate_Closed;
+                    _webSocketPrivate.OnMessage -= WebSocketPrivate_MessageReceived;
+                    _webSocketPrivate.OnError -= WebSocketPrivate_Error;
 
                     try
                     {
@@ -1127,16 +1120,13 @@ namespace OsEngine.Market.Servers.Bitfinex
         private void WebSocketPublic_Opened(object sender, EventArgs e)
         {
             Thread.Sleep(2000);
-
             _publicSocketActive = true;
 
             try
             {
-                // _socketPublicIsActive = true;//отвечает за соединение
-
                 CheckActivationSockets();
+                SendLogMessage("WebSocket public Bitfinex Opened", LogMessageType.System);
 
-                SendLogMessage("Websocket public Bitfinex Opened", LogMessageType.System);
                 // Настраиваем таймер для отправки пинга каждые 30 секунд
                 _pingTimer = new Timer(30000); // 30 секунд
                 _pingTimer.Elapsed += SendPing;
@@ -1148,95 +1138,71 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-        private void WebSocketPublic_Closed(object sender, EventArgs e)
+
+        private void WebSocketPublic_Closed(object sender, CloseEventArgs e)
         {
             try
             {
                 if (ServerStatus != ServerConnectStatus.Disconnect)
                 {
                     ServerStatus = ServerConnectStatus.Disconnect;
-                    DisconnectEvent();
+                    DisconnectEvent?.Invoke();
                 }
-                // Останавливаем таймер, если он был запущен
+
                 if (_pingTimer != null)
                 {
-                    _pingTimer.Stop();  // Останавливаем таймер
-                    _pingTimer.Elapsed -= SendPing;  // Отписываемся от события Elapsed
-                    _pingTimer = null;  // Очищаем таймер
+                    _pingTimer.Stop();
+                    _pingTimer.Elapsed -= SendPing;
+                    _pingTimer = null;
                 }
-                SendLogMessage("WebSocket Public сlosed by Bitfinex.", LogMessageType.Error);
+                SendLogMessage("WebSocket Public closed by Bitfinex.", LogMessageType.Error);
             }
             catch (Exception exception)
             {
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-        private void WebSocketPublic_Error(object sender, ErrorEventArgs e)
+
+        private void WebSocketPublic_Error(object sender, WebSocketSharp.ErrorEventArgs e)
         {
             try
             {
-                if (e.Exception != null)
+                if (!string.IsNullOrEmpty(e.Message))
                 {
-                    SendLogMessage(e.Exception.ToString(), LogMessageType.Error);
-                }
-
-                if (e == null || string.IsNullOrEmpty(e.ToString()))
-                {
-                    return;
-                }
-
-                if (_webSocketPublicMessage == null)
-                {
-                    return;
+                    SendLogMessage($"WebSocket Error: {e.Message}", LogMessageType.Error);
                 }
             }
             catch (Exception exception)
             {
-                SendLogMessage("Data socket exception" + exception.ToString(), LogMessageType.Error);
+                SendLogMessage("Data socket exception: " + exception.ToString(), LogMessageType.Error);
             }
         }
-        private void WebSocketPublic_MessageReceived(object sender, MessageReceivedEventArgs e)
+
+        private void WebSocketPublic_MessageReceived(object sender, MessageEventArgs e)
         {
             try
             {
-                if (ServerStatus == ServerConnectStatus.Disconnect)
+                if (ServerStatus == ServerConnectStatus.Disconnect || e?.Data == null || string.IsNullOrEmpty(e.Data))
                 {
                     return;
                 }
 
-                if (e == null)
-                {
-                    return;
-                }
-
-                if (string.IsNullOrEmpty(e.Message))
-                {
-                    return;
-                }
-
-                if (_webSocketPublicMessage == null)
-                {
-                    return;
-                }
-
-                _webSocketPublicMessage.Enqueue(e.Message);
+                _webSocketPublicMessage?.Enqueue(e.Data);
             }
             catch (Exception exception)
             {
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
+
         private void WebSocketPrivate_Opened(object sender, EventArgs e)
         {
-
             _privateSocketActive = true;
 
             try
             {
                 GenerateAuthenticate();
-
                 CheckActivationSockets();
-
                 SendLogMessage("Connection to private data is Open", LogMessageType.System);
 
                 // Настраиваем таймер для отправки пинга каждые 30 секунд
@@ -1249,22 +1215,22 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
-
         }
-        private void WebSocketPrivate_Closed(object sender, EventArgs e)
+        private void WebSocketPrivate_Closed(object sender, CloseEventArgs e)
         {
             try
             {
                 if (ServerStatus != ServerConnectStatus.Disconnect)
                 {
                     ServerStatus = ServerConnectStatus.Disconnect;
-                    DisconnectEvent();
+                    DisconnectEvent?.Invoke();
                 }
+
                 if (_pingTimer != null)
                 {
-                    _pingTimer.Stop();  // Останавливаем таймер
-                    _pingTimer.Elapsed -= SendPing;  // Отписываемся от события Elapsed
-                    _pingTimer = null;  // Очищаем таймер
+                    _pingTimer.Stop();
+                    _pingTimer.Elapsed -= SendPing;
+                    _pingTimer = null;
                 }
             }
             catch (Exception exception)
@@ -1272,15 +1238,16 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
 
-            SendLogMessage("Connection Closed by Bitfinex. WebSocket Private сlosed ", LogMessageType.Error);
+            SendLogMessage("Connection Closed by Bitfinex. WebSocket Private closed", LogMessageType.Error);
         }
-        private void WebSocketPrivate_Error(object sender, ErrorEventArgs e)
+
+        private void WebSocketPrivate_Error(object sender, WebSocketSharp.ErrorEventArgs e)
         {
             try
             {
-                if (e.Exception != null)
+                if (!string.IsNullOrEmpty(e.Message))
                 {
-                    SendLogMessage(e.Exception.ToString(), LogMessageType.Error);
+                    SendLogMessage($"WebSocket Error: {e.Message}", LogMessageType.Error);
                 }
             }
             catch (Exception exception)
@@ -1288,26 +1255,17 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-        private void WebSocketPrivate_MessageReceived(object sender, MessageReceivedEventArgs e)
+
+        private void WebSocketPrivate_MessageReceived(object sender, MessageEventArgs e)
         {
             try
             {
-                if (ServerStatus == ServerConnectStatus.Disconnect)
+                if (ServerStatus == ServerConnectStatus.Disconnect || string.IsNullOrEmpty(e?.Data))
                 {
                     return;
                 }
 
-                if (e == null || string.IsNullOrEmpty(e.Message))
-                {
-                    return;
-                }
-
-                if (_webSocketPrivateMessage == null)
-                {
-                    return;
-                }
-
-                _webSocketPrivateMessage.Enqueue(e.Message);
+                _webSocketPrivateMessage?.Enqueue(e.Data);
             }
             catch (Exception exception)
             {
@@ -1363,15 +1321,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     if (ServerStatus != ServerConnectStatus.Connect &&
                         _webSocketPublic != null && _webSocketPrivate != null &&
-                        _webSocketPublic.State == WebSocketState.Open &&
-                        _webSocketPrivate.State == WebSocketState.Open)
+                        _webSocketPublic.ReadyState == WebSocketState.Open &&
+                        _webSocketPrivate.ReadyState == WebSocketState.Open)
                     {
                         ServerStatus = ServerConnectStatus.Connect;
 
-                        if (ConnectEvent != null)
-                        {
-                            ConnectEvent();
-                        }
+                        ConnectEvent?.Invoke();
                     }
 
                     SendLogMessage("All sockets activated.", LogMessageType.System);
@@ -1386,7 +1341,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         {
             try
             {
-                if (_webSocketPublic != null && _webSocketPublic.State == WebSocketState.Open)
+                if (_webSocketPublic != null && _webSocketPublic.ReadyState == WebSocketState.Open)
                 {
                     string pingMessage = "{\"event\":\"ping\", \"cid\":1234}";
                     _webSocketPublic.Send(pingMessage);
