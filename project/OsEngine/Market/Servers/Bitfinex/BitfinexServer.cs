@@ -13,7 +13,6 @@ using Newtonsoft.Json.Linq;
 using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Logging;
-using OsEngine.Market.Servers.BingX.BingXFutures.Entity;
 using OsEngine.Market.Servers.Bitfinex.Json;
 using OsEngine.Market.Servers.Entity;
 using RestSharp;
@@ -86,7 +85,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 request.AddHeader("accept", "application/json");
 
                 IRestResponse response = client.Execute(request);
-
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
