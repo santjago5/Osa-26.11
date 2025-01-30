@@ -1936,10 +1936,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     volume = Math.Abs(volume);
                 }
-                // Расчет объема с учетом комиссии
-                decimal preVolume = volume + Math.Abs((tradeData[9]).ToString().ToDecimal());
-
-                myTrade.Volume = GetVolumeForMyTrade(myTrade.SecurityNameCode, preVolume);
+                
+                myTrade.Volume = volume;
 
                 MyTradeEvent?.Invoke(myTrade);
 
@@ -2052,8 +2050,9 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     newOrder.OrderType = "EXCHANGE MARKET";
                 }
-                // newOrder.OrderType = order.TypeOrder.ToString() == "Limit" ? "EXCHANGE LIMIT" : "EXCHANGE MARKET";
+                
                 newOrder.Price = order.TypeOrder == OrderPriceType.Market ? null : order.Price.ToString().Replace(",", ".");
+
                 if (order.Side.ToString() == "Sell")
                 {
                     //newOrder.Amount = (-order.Volume).ToString(CultureInfo.InvariantCulture);
@@ -2066,11 +2065,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                   
                 }
                 string body = $"{{\"type\":\"{newOrder.OrderType}\",\"symbol\":\"{newOrder.Symbol}\",\"amount\":\"{newOrder.Amount}\",\"price\":\"{newOrder.Price}\",\"cid\":{newOrder.Cid}}}";
-                //var body = $"{{\"type\":\"{newOrder.OrderType}\"," +
-                //      $"\"symbol\":\"{newOrder.Symbol}\"," +
-                //      $"\"amount\":\"{newOrder.Amount}\"," +
-                //      $"\"price\":\"{newOrder.Price}\"," +
-                //      $"\"cid\":{newOrder.Cid}}}";
+             
 
                 string signature = $"/api/{_apiPath}{nonce}{body}";
 
@@ -2817,14 +2812,13 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
                 string _apiPath = $"v2/auth/r/order/{symbol}:{orderId}/trades";
-                //string _apiPath = $"v2/auth/r/order/{symbol}:{194073505132}/trades";
                 string signature = $"/api/{_apiPath}{nonce}";
 
                 var client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);//"194073505132"
+                var request = new RestRequest(_apiPath, Method.POST);
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
-                request.AddHeader("accept", "application/json");//		_apiPath	"v2/auth/r/order/tTRXUSD:194113281681/trades"	string
+                request.AddHeader("accept", "application/json");//		
 
                 request.AddHeader("bfx-nonce", nonce);
                 request.AddHeader("bfx-apikey", _publicKey);
@@ -2862,9 +2856,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                         myTrade.Volume = GetVolumeForMyTrade(myTrade.SecurityNameCode, preVolume);
 
-                        trades.Add(myTrade);//number trade "1708026164"
-
-                        MyTradeEvent?.Invoke(myTrade);
+                        trades.Add(myTrade);
                     }
                 }
                 else
