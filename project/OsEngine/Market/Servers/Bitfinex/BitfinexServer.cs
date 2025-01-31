@@ -282,18 +282,18 @@ namespace OsEngine.Market.Servers.Bitfinex
             try
             {
                 string _apiPatch = "/v2/conf/pub:info:pair"; //для спота
-                var client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPatch, Method.GET);
+                RestClient client = new RestClient(_baseUrl);
+                RestRequest request = new RestRequest(_apiPatch, Method.GET);
 
-                var response = client.Execute(request);
+                IRestResponse response = client.Execute(request);
 
                 if (response.StatusCode == HttpStatusCode.OK && !string.IsNullOrEmpty(response.Content))
                 {
-                    var data = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
+                    List<List<object>> data = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
 
                     for (int i = 0; i < data.Count; i++)
                     {
-                        var subArray = data[i];
+                        List<object> subArray = data[i];
 
                         for (int j = 0; j < subArray.Count; j++)
                         {
@@ -374,7 +374,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
                 RestClient client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);
+                RestRequest request = new RestRequest(_apiPath, Method.POST);
 
                 request.AddHeader("accept", "application/json");
                 request.AddHeader("bfx-nonce", nonce);
@@ -565,7 +565,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 string _apiPath = $"/v2/trades/{security}/hist?limit={count}&start={startDate}&end={endDate}";
                 RestClient client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.GET);
+                RestRequest request = new RestRequest(_apiPath, Method.GET);
                 request.AddHeader("accept", "application/json");
 
                 IRestResponse response = client.Execute(request);
@@ -895,7 +895,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 string _apiPath = $"/v2/candles/trade:{tf}:{nameSec}/hist?sort=1&start={startDate}&end={endDate}&limit={limit}";
                 RestClient client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.GET);
+                RestRequest request = new RestRequest(_apiPath, Method.GET);
                 request.AddHeader("accept", "application/json");
 
                 IRestResponse response = client.Execute(request);
@@ -1279,11 +1279,18 @@ namespace OsEngine.Market.Servers.Bitfinex
                 string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
                 string authPayload = "AUTH" + nonce;
                 string authSig;
-                using (var hmac = new HMACSHA384(Encoding.UTF8.GetBytes(_secretKey)))
+                using (HMACSHA384 hmac = new HMACSHA384(Encoding.UTF8.GetBytes(_secretKey)))
                 {
                     byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(authPayload));
                     authSig = BitConverter.ToString(hash).Replace("-", "").ToLower();
                 }
+                //var payload = new AuthPayload();
+
+                //payload.Event = "auth";
+                //payload.ApiKey = _publicKey;
+                //payload.AuthSig = authSig;
+                //payload.AuthNonce = nonce;
+                //payload.AuthPayloadData = authPayload;
 
                 var payload = new
                 {
@@ -1293,6 +1300,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     authNonce = nonce,
                     authPayload = authPayload
                 };
+
                 string authJson = JsonConvert.SerializeObject(payload);
 
                 _webSocketPrivate.Send(authJson);
@@ -1467,7 +1475,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                     if (message.Contains("[["))
                     {
-                        var root = JsonConvert.DeserializeObject<List<object>>(message);
+                        List<object> root = JsonConvert.DeserializeObject<List<object>>(message);
 
                         int channelId = Convert.ToInt32(root[0]);
 
@@ -1531,7 +1539,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                     if (message.Contains("\"event\":\"auth\""))
                     {
-                        var authResponse = JsonConvert.DeserializeObject<BitfinexAuthResponseWebSocket>(message);
+                        BitfinexAuthResponseWebSocket authResponse = JsonConvert.DeserializeObject<BitfinexAuthResponseWebSocket>(message);
 
                         if (authResponse.Status == "OK")
                         {
@@ -1599,7 +1607,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     _marketDepths = new List<MarketDepth>();
                 }
-                var needDepth = _marketDepths.Find(depth =>
+                MarketDepth needDepth = _marketDepths.Find(depth =>
                     depth.SecurityNameCode == securityName);
 
                 if (needDepth == null)
@@ -1695,17 +1703,17 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     return;
                 }
-                var needDepth = _marketDepths.Find(depth =>
-                    depth.SecurityNameCode == securityName);
+                MarketDepth needDepth = _marketDepths.Find(depth =>
+                      depth.SecurityNameCode == securityName);
 
                 if (needDepth == null)
                 {
                     return;
                 }
 
-                var price = (update[0]).ToString().ToDecimal();
-                var count = (update[1]).ToString().ToDecimal();
-                var amount = (update[2]).ToString().ToDecimal();
+                decimal price = (update[0]).ToString().ToDecimal();
+                decimal count = (update[1]).ToString().ToDecimal();
+                decimal amount = (update[2]).ToString().ToDecimal();
 
                 needDepth.Time = ServerTime;
 
@@ -1737,7 +1745,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 else if (amount > 0)
                 {
-                    var needLevel = needDepth.Bids.Find(bid => bid.Price == price);
+                    MarketDepthLevel needLevel = needDepth.Bids.Find(bid => bid.Price == price);
 
                     if (needLevel == null)
                     {
@@ -1756,7 +1764,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
                 else if (amount < 0)
                 {
-                    var needLevel = needDepth.Asks.Find(ask => ask.Price == price);
+                    MarketDepthLevel needLevel = needDepth.Asks.Find(ask => ask.Price == price);
 
                     if (needLevel == null)
                     {
@@ -1815,13 +1823,13 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
             try
             {
-                var root = JsonConvert.DeserializeObject<List<object>>(message);
+                List<object> root = JsonConvert.DeserializeObject<List<object>>(message);
 
                 if (root == null && root.Count < 2)
                 {
                     return;
                 }
-                var tradeData = JsonConvert.DeserializeObject<List<object>>(root[2].ToString());
+                List<object> tradeData = JsonConvert.DeserializeObject<List<object>>(root[2].ToString());
                 int channelId = Convert.ToInt32(root[0]);
 
                 if (tradeData == null && tradeData.Count < 4)
@@ -1862,7 +1870,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     return;
                 }
 
-                var tradeDataJson = tradyList[2]?.ToString();///посмотреть
+                string tradeDataJson = tradyList[2]?.ToString();///посмотреть
 
                 if (string.IsNullOrEmpty(tradeDataJson))
                 {
@@ -1889,7 +1897,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     volume = Math.Abs(volume);
                 }
-                
+
                 myTrade.Volume = volume;
 
                 MyTradeEvent?.Invoke(myTrade);
@@ -1912,7 +1920,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     return;
                 }
 
-                var orderDataList = JsonConvert.DeserializeObject<List<object>>(rootArray[2].ToString());
+                List<object> orderDataList = JsonConvert.DeserializeObject<List<object>>(rootArray[2].ToString());
 
                 if (orderDataList == null)
                 {
@@ -2003,7 +2011,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     newOrder.OrderType = "EXCHANGE MARKET";
                 }
-                
+
                 newOrder.Price = order.TypeOrder == OrderPriceType.Market ? null : order.Price.ToString().Replace(",", ".");
 
                 if (order.Side.ToString() == "Sell")
@@ -2015,15 +2023,15 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     //newOrder.Amount = order.Volume.ToString(CultureInfo.InvariantCulture);
                     newOrder.Amount = (order.Volume).ToString().Replace(",", ".");
-                  
+
                 }
                 string body = $"{{\"type\":\"{newOrder.OrderType}\",\"symbol\":\"{newOrder.Symbol}\",\"amount\":\"{newOrder.Amount}\",\"price\":\"{newOrder.Price}\",\"cid\":{newOrder.Cid}}}";
-             
+
 
                 string signature = $"/api/{_apiPath}{nonce}{body}";
 
-                var client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);
+                RestClient client = new RestClient(_baseUrl);
+                RestRequest request = new RestRequest(_apiPath, Method.POST);
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
                 request.AddHeader("accept", "application/json");
@@ -2032,7 +2040,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 request.AddHeader("bfx-signature", sig);
                 request.AddParameter("application/json", body, ParameterType.RequestBody);
 
-                var response = client.Execute(request);
+                IRestResponse response = client.Execute(request);
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -2120,8 +2128,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 string body = $"{{\"all\":1}}";
 
                 string signature = $"/api/{_apiPath}{nonce}{body}";
-                var client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);
+                RestClient client = new RestClient(_baseUrl);
+                RestRequest request = new RestRequest(_apiPath, Method.POST);
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
                 request.AddHeader("accept", "application/json");
@@ -2176,8 +2184,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 string body = $"{{\"id\":{order.NumberMarket}}}";
 
                 string signature = $"/api/{_apiPath}{nonce}{body}";
-                var client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);
+                RestClient client = new RestClient(_baseUrl);
+                RestRequest request = new RestRequest(_apiPath, Method.POST);
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
                 request.AddHeader("accept", "application/json");
@@ -2235,8 +2243,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 string body = $"{{\"id\":{order.NumberMarket},\"price\":\"{price}\"}}";
 
                 string signature = $"/api/{_apiPath}{nonce}{body}";
-                var client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);
+                RestClient client = new RestClient(_baseUrl);
+                RestRequest request = new RestRequest(_apiPath, Method.POST);
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
                 request.AddHeader("accept", "application/json");
@@ -2263,11 +2271,30 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     string responseBody = response.Content;
 
-                    var responseArray = JsonConvert.DeserializeObject<List<object>>(responseBody);
-                    var orderDataArray = JsonConvert.DeserializeObject<List<object>>(responseArray[4].ToString());
+                    if (string.IsNullOrEmpty(responseBody))
+                    {
+                        SendLogMessage("Response body is empty.", LogMessageType.Error);
+                        return;
+                    }
+
+                    List<object> responseArray = JsonConvert.DeserializeObject<List<object>>(responseBody);
+
+                    if (responseArray == null)
+                    {
+                        SendLogMessage("Invalid response array structure.", LogMessageType.Error);
+                        return;
+                    }
+
+                    List<object> orderDataArray = JsonConvert.DeserializeObject<List<object>>(responseArray[4].ToString());
+
+                    if (orderDataArray == null)
+                    {
+                        SendLogMessage("Invalid response array structure.", LogMessageType.Error);
+                        return;
+                    }
 
                     order.Price = orderDataArray[16].ToString().ToDecimal();
-                    order.State = GetOrderState(orderDataArray[13].ToString()); 
+                    order.State = GetOrderState(orderDataArray[13].ToString());
 
                     SendLogMessage("Order change price. New price: " + order.Price
                       + "  " + order.SecurityNameCode, LogMessageType.Trade);
@@ -2299,8 +2326,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 string _apiPath = "v2/auth/r/orders";
                 string signature = $"/api/{_apiPath}{nonce}";
 
-                var client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);
+                RestClient client = new RestClient(_baseUrl);
+                RestRequest request = new RestRequest(_apiPath, Method.POST);
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
                 request.AddHeader("accept", "application/json");
@@ -2312,7 +2339,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
-                    string responseBody = response.Content;// пустой массив
+                    string responseBody = response.Content;
 
                     if (string.IsNullOrEmpty(responseBody) || responseBody == "[]")
                     {
@@ -2324,7 +2351,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                     for (int i = 0; i < listOrders.Count; i++)
                     {
-                        var orderData = listOrders[i];
+                        List<object> orderData = listOrders[i];
 
                         Order activOrder = new Order();
 
@@ -2349,7 +2376,6 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                         orders.Add(activOrder);
 
-                        MyOrderEvent?.Invoke(activOrder);
                     }
                 }
 
@@ -2377,7 +2403,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                 List<Order> ordersHistory = GetHistoryOrders();
 
-                var orderData = ordersHistory.FirstOrDefault(o => o.NumberUser == order.NumberUser);
+                Order orderData = ordersHistory.FirstOrDefault(o => o.NumberUser == order.NumberUser);
 
                 if (ordersHistory == null ||
                 ordersHistory.Count == 0)
@@ -2487,15 +2513,15 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
         }
 
-            public List<List<object>> GetHistoryOrders1()
+        public List<List<object>> GetHistoryOrders1()
         {
             string nonce = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
 
             string _apiPath = "v2/auth/r/orders/hist";
             string signature = $"/api/{_apiPath}{nonce}";
 
-            var client = new RestClient(_baseUrl);
-            var request = new RestRequest(_apiPath, Method.POST);
+            RestClient client = new RestClient(_baseUrl);
+            RestRequest request = new RestRequest(_apiPath, Method.POST);
             string sig = ComputeHmacSha384(_secretKey, signature);
 
             request.AddHeader("accept", "application/json");
@@ -2503,12 +2529,13 @@ namespace OsEngine.Market.Servers.Bitfinex
             request.AddHeader("bfx-apikey", _publicKey);
             request.AddHeader("bfx-signature", sig);
 
-            IRestResponse response = client.Execute(request);
+            IRestResponse response = client.Execute(request); 
+
             try
             {
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
-                    var orderData = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
+                    List<List<object>> orderData = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
 
                     if (orderData != null)
                     {
@@ -2545,13 +2572,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                         myOrder.PortfolioNumber = "BitfinexPortfolio";
                         myOrder.VolumeExecute = volume;
                         myOrder.Volume = volume;
-
                     }
+
                     else
                     {
                         Console.WriteLine("The order with NumberUser was not found.");
                     }
-
                 }
             }
             catch (Exception exception)
@@ -2560,7 +2586,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             }
             return null;
         }
-        
+
 
         private Order GetActiveOrder(string id)
         {
@@ -2582,8 +2608,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 string _apiPath = "v2/auth/r/orders";
                 string signature = $"/api/{_apiPath}{nonce}{body}";
 
-                var client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);
+                RestClient client = new RestClient(_baseUrl);
+                RestRequest request = new RestRequest(_apiPath, Method.POST);
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
                 request.AddHeader("accept", "application/json");
@@ -2632,8 +2658,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                         activOrder.PortfolioNumber = "BitfinexPortfolio";
 
                         orders.Add(activOrder);
-
-                        MyOrderEvent?.Invoke(orders[i]);
                     }
                 }
                 else
@@ -2677,8 +2701,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 string _apiPath = "v2/auth/r/orders/hist";
                 string signature = $"/api/{_apiPath}{nonce}";
 
-                var client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);
+                RestClient client = new RestClient(_baseUrl);
+                RestRequest request = new RestRequest(_apiPath, Method.POST);
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
                 request.AddHeader("accept", "application/json");
@@ -2690,13 +2714,13 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
-                    var data = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
+                    List<List<object>> data = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
 
                     if (data != null && data.Count > 0)
                     {
                         for (int i = 0; i < data.Count; i++)
                         {
-                            var orderData = data[i];
+                            List<object> orderData = data[i];
 
                             if (orderData != null && orderData.Count > 0)
                             {
@@ -2706,7 +2730,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                                 {
                                     historyOrder.NumberUser = Convert.ToInt32(number);
                                 }
-                               
+
                                 historyOrder.NumberMarket = orderData[0]?.ToString();
                                 historyOrder.TimeCreate = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderData[5]));
                                 historyOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderData[4]));
@@ -2767,8 +2791,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                 string _apiPath = $"v2/auth/r/order/{symbol}:{orderId}/trades";
                 string signature = $"/api/{_apiPath}{nonce}";
 
-                var client = new RestClient(_baseUrl);
-                var request = new RestRequest(_apiPath, Method.POST);
+                RestClient client = new RestClient(_baseUrl);
+                RestRequest request = new RestRequest(_apiPath, Method.POST);
                 string sig = ComputeHmacSha384(_secretKey, signature);
 
                 request.AddHeader("accept", "application/json");//		
@@ -2787,7 +2811,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                     for (int i = 0; i < tradesData.Count; i++)
                     {
-                        var tradeData = tradesData[i];
+                        List<object> tradeData = tradesData[i];
 
                         MyTrade myTrade = new MyTrade();
 
@@ -2804,7 +2828,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         {
                             volume = Math.Abs(volume);
                         }
-                       
+
                         decimal preVolume = volume + Math.Abs(Convert.ToDecimal(tradeData[9]));// посмотреть как считается комиссия
 
                         myTrade.Volume = GetVolumeForMyTrade(myTrade.SecurityNameCode, preVolume);

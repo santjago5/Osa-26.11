@@ -104,7 +104,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         public int WaitTimeSecondsAfterFirstStartToSendOrders
         {
-            get { return 5; }
+            get { return 10; }
         }
 
         private TimeFramePermission _tradeTimeFramePermission
@@ -142,7 +142,7 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
         public bool ManuallyClosePositionOnBoard_IsOn
         {
-            get { return true; }
+            get { return false; }
         }
         public string[] ManuallyClosePositionOnBoard_ValuesForTrimmingName
         {
