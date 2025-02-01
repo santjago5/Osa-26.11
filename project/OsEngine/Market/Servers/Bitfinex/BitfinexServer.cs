@@ -648,7 +648,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
                 string timeFrame = GetInterval(tf);
 
-                List<Candle> rangeCandles = CreateQueryCandles(nameSec, timeFrame, periodStart, periodEnd, candlesToLoad);
+               List<Candle> rangeCandles = CreateQueryCandles(nameSec, timeFrame, periodStart, periodEnd, candlesToLoad);
 
                 if (rangeCandles == null || rangeCandles.Count == 0)
                 {
@@ -1461,16 +1461,26 @@ namespace OsEngine.Market.Servers.Bitfinex
                     {
                         BitfinexSubscriptionResponse responseTrade = JsonConvert.DeserializeObject<BitfinexSubscriptionResponse>(message);
 
-                        _tradeDictionary.Add(Convert.ToInt32(responseTrade.ChanId), responseTrade.Symbol);
-                        _channelIdTrade = Convert.ToInt32(responseTrade.ChanId);
+                        int key = Convert.ToInt32(responseTrade.ChanId);
+
+                        if (!_tradeDictionary.ContainsKey(key)) 
+                        {
+                            _tradeDictionary.Add(key, responseTrade.Symbol);
+                            _channelIdTrade = key;
+                        }
                     }
 
                     else if (message.Contains("book"))
                     {
                         BitfinexSubscriptionResponse responseDepth = JsonConvert.DeserializeObject<BitfinexSubscriptionResponse>(message);
 
-                        _depthDictionary.Add(Convert.ToInt32(responseDepth.ChanId), responseDepth.Symbol);
-                        _currentChannelIdDepth = Convert.ToInt32(responseDepth.ChanId);
+                        int key = Convert.ToInt32(responseDepth.ChanId);
+
+                        if (!_depthDictionary.ContainsKey(key)) 
+                        {
+                            _depthDictionary.Add(key, responseDepth.Symbol);
+                            _currentChannelIdDepth = key;
+                        }
                     }
 
                     if (message.Contains("[["))
