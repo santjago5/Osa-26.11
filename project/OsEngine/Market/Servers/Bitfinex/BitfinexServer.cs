@@ -1567,7 +1567,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                     {
                         UpdateMyTrade(message);
                     }
-                    
+
                     else if (message.StartsWith("[0,\"on\",[") || message.StartsWith("[0,\"oc\",[") || message.StartsWith("[0,\"ou\",["))
                     {
                         UpdateOrder(message);
@@ -2061,11 +2061,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                         return;
                     }
 
-                    //  _osOrders.Add(newCreatedOrder.id.ToString(), order.NumberUser);
-
                     List<object> orders = ordersArray[0]; // Получаем первый заказ из массива
-                    string status = orders[13].ToString();
-                    string numUser = (orders[2]).ToString();
 
                     if (orders[0] != null)// if(numberUser==cid)
                     {
@@ -2074,8 +2070,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                         newOsOrder.SecurityNameCode = (orders[3]).ToString();
                         newOsOrder.NumberMarket = orders[0].ToString();//190240109337
                         newOsOrder.NumberUser = Convert.ToInt32(orders[2]);
-                        newOsOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orders[4]));
                         newOsOrder.State = GetOrderState(orders[13].ToString());
+                        newOsOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orders[4]));
                         newOsOrder.SecurityClassCode = orders[3].ToString().StartsWith("f") ? "Futures" : "CurrencyPair";
                         newOsOrder.Side = (orders[6]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell;
                         newOsOrder.ServerType = ServerType.Bitfinex;
@@ -2107,10 +2103,12 @@ namespace OsEngine.Market.Servers.Bitfinex
                 else
                 {
                     SendLogMessage($"Error Order exception {response.Content}", LogMessageType.Error);
+
                     order.State = OrderStateType.Fail;
+
+                    MyOrderEvent?.Invoke(order);
                 }
 
-                MyOrderEvent?.Invoke(order);
             }
             catch (Exception exception)
             {
