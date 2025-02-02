@@ -648,7 +648,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 }
                 string timeFrame = GetInterval(tf);
 
-               List<Candle> rangeCandles = CreateQueryCandles(nameSec, timeFrame, periodStart, periodEnd, candlesToLoad);
+                List<Candle> rangeCandles = CreateQueryCandles(nameSec, timeFrame, periodStart, periodEnd, candlesToLoad);
 
                 if (rangeCandles == null || rangeCandles.Count == 0)
                 {
@@ -1463,7 +1463,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                         int key = Convert.ToInt32(responseTrade.ChanId);
 
-                        if (!_tradeDictionary.ContainsKey(key)) 
+                        if (!_tradeDictionary.ContainsKey(key))
                         {
                             _tradeDictionary.Add(key, responseTrade.Symbol);
                             _channelIdTrade = key;
@@ -1476,7 +1476,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
                         int key = Convert.ToInt32(responseDepth.ChanId);
 
-                        if (!_depthDictionary.ContainsKey(key)) 
+                        if (!_depthDictionary.ContainsKey(key))
                         {
                             _depthDictionary.Add(key, responseDepth.Symbol);
                             _currentChannelIdDepth = key;
@@ -1567,9 +1567,8 @@ namespace OsEngine.Market.Servers.Bitfinex
                     {
                         UpdateMyTrade(message);
                     }
-
-                    else if
-                       (message.StartsWith("[0,\"oc\",[") || message.StartsWith("[0,\"ou\",["))
+                    
+                    else if (message.StartsWith("[0,\"on\",[") || message.StartsWith("[0,\"oc\",[") || message.StartsWith("[0,\"ou\",["))
                     {
                         UpdateOrder(message);
                     }
@@ -1929,6 +1928,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     return;
                 }
+                //[0,"on",[194792142057,null,1726,"tTRXUSD",1738503338935,1738503338936,22,22,"EXCHANGE LIMIT",null,null,null,0,"ACTIVE",null,null,0.23758,0,0,0,null,null,null,0,0,null,null,null,"API>BFX",null,null,{}]]
 
                 List<object> orderDataList = JsonConvert.DeserializeObject<List<object>>(rootArray[2].ToString());
 
@@ -1969,19 +1969,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 updateOrder.VolumeExecute = volume;
                 updateOrder.Volume = volume;
                 updateOrder.PortfolioNumber = "BitfinexPortfolio";
-
-                //if (updateOrder.State == OrderStateType.Active)
-                //{
-                //    Order orderFromActive = GetActiveOrder(updateOrder.NumberMarket);
-
-                //    if (orderFromActive != null)
-                //    {
-                //        updateOrder = orderFromActive;
-
-                //        SendLogMessage($"Order updated from history: {orderFromActive.NumberMarket}, Status: {orderFromActive.State}", LogMessageType.Trade);
-                //    }
-                //}
-
 
                 MyOrderEvent?.Invoke(updateOrder);
             }
@@ -2121,8 +2108,9 @@ namespace OsEngine.Market.Servers.Bitfinex
                 {
                     SendLogMessage($"Error Order exception {response.Content}", LogMessageType.Error);
                     order.State = OrderStateType.Fail;
-                    MyOrderEvent?.Invoke(order);
                 }
+
+                MyOrderEvent?.Invoke(order);
             }
             catch (Exception exception)
             {
@@ -2166,7 +2154,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                         SendLogMessage("Deserialization resulted in null", LogMessageType.Error);
                         return;
                     }
-
 
                     if (responseJson.Contains("oc_multi-req"))
                     {
