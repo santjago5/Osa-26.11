@@ -1206,11 +1206,11 @@ namespace OsEngine.Market.Servers.Bitfinex
                 CheckActivationSockets();
                 SendLogMessage("Connection to private data is Open", LogMessageType.System);
 
-                // Настраиваем таймер для отправки пинга каждые 30 секунд
-                _pingTimer = new Timer(30000); // 30 секунд
-                _pingTimer.Elapsed += SendPing;
-                _pingTimer.AutoReset = true;
-                _pingTimer.Start();
+                //// Настраиваем таймер для отправки пинга каждые 30 секунд
+                //_pingTimer = new Timer(30000); // 30 секунд
+                //_pingTimer.Elapsed += SendPing;
+                //_pingTimer.AutoReset = true;
+                //_pingTimer.Start();
             }
             catch (Exception exception)
             {
@@ -1241,7 +1241,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             SendLogMessage("Connection Closed by Bitfinex. WebSocket Private closed", LogMessageType.Error);
         }
-        private void WebSocketPrivate_Error(object sender, WebSocketSharp.ErrorEventArgs e)
+        private void WebSocketPrivate_Error(object sender, ErrorEventArgs e)
         {
             try
             {
@@ -1451,11 +1451,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                         continue;
                     }
 
-                    else if (message.Contains("event") || message.Contains("hb") || message.Contains("auth"))
-                    {
-                        //continue;
-                    }
-
                     if (message.Contains("trades"))
                     {
                         BitfinexSubscriptionResponse responseTrade = JsonConvert.DeserializeObject<BitfinexSubscriptionResponse>(message);
@@ -1493,13 +1488,16 @@ namespace OsEngine.Market.Servers.Bitfinex
                             SendLogMessage("Incorrect message format: insufficient elements.", LogMessageType.Error);
                             return;
                         }
+
                         if (channelId == _currentChannelIdDepth)
                         {
                             SnapshotDepth(message);
                         }
                     }
 
-                    if (!message.Contains("[[") && !message.Contains("te") && !message.Contains("tu") && !message.Contains("ws") && !message.Contains("event") && !message.Contains("hb"))
+                    if (!message.Contains("[[") && !message.Contains("te") && 
+                        !message.Contains("tu") && !message.Contains("ws") &&
+                        !message.Contains("event") && !message.Contains("hb"))
                     {
                         UpdateDepth(message);
                     }
@@ -2500,20 +2498,19 @@ namespace OsEngine.Market.Servers.Bitfinex
 
         public void GetOrderStatus(Order order)
         {
-            if (order == null || order.NumberUser == 0)
-            {
-                SendLogMessage("Order or NumberUser is null/zero.", LogMessageType.Error);
-                return;
-            }
-
             try
             {
+                if (order == null || order.NumberUser == 0)
+                {
+                    SendLogMessage("Order or NumberUser is null/zero.", LogMessageType.Error);
+                    return;
+                }
+
                 List<Order> ordersActive = GetAllActiveOrders();
                 List<Order> ordersHistory = GetHistoryOrders();
 
                 Order orderOnMarket = ordersActive?.FirstOrDefault(o => o.NumberUser == order.NumberUser);
 
-                
                 if (orderOnMarket == null && ordersHistory != null && ordersHistory.Count > 0)
                 {
                     orderOnMarket = ordersHistory.FirstOrDefault(o => o.NumberUser == order.NumberUser);
@@ -2532,7 +2529,6 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-  
         public void GetAllActivOrders()
         {
             List<Order> orders = GetAllActiveOrders();
@@ -2542,10 +2538,10 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage("No active orders found.", LogMessageType.Trade);
                 return;
             }
-           
+
             for (int i = 0; i < orders.Count; i++)
             {
-               
+
                 //orders[i].TimeCallBack = orders[i].TimeCallBack;
                 //orders[i].State = (orders[i].State);
 

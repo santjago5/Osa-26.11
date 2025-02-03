@@ -463,18 +463,9 @@
     <Compile Include="Logging\ServerTelegramUi.xaml.cs">
       <DependentUpon>ServerTelegramUi.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Market\Servers\Bitfinex\Json\BitfinexBook.cs" />
     <Compile Include="Market\Servers\Bitfinex\Json\BitfinexCandle.cs" />
-    <Compile Include="Market\Servers\Bitfinex\Json\BitfinexMarketDepthMessage.cs" />
-    <Compile Include="Market\Servers\Bitfinex\Json\BitfinexMyTrade.cs" />
     <Compile Include="Market\Servers\Bitfinex\Json\BitfinexOrder.cs" />
-    <Compile Include="Market\Servers\Bitfinex\Json\BitfinexPortfolioRest.cs" />
-    <Compile Include="Market\Servers\Bitfinex\Json\BitfinexPortfolioSocket.cs" />
-    <Compile Include="Market\Servers\Bitfinex\Json\BitfinexResponceWebSocket.cs" />
-    <Compile Include="Market\Servers\Bitfinex\Json\BitfinexSecurity.cs" />
-    <Compile Include="Market\Servers\Bitfinex\Json\BitfinexSoketMessageBase.cs" />
     <Compile Include="Market\Servers\Bitfinex\Json\BitfinexWebsocketTrades.cs" />
-    <Compile Include="Market\Servers\Bitfinex\Json\Security1.cs" />
     <Compile Include="Market\Servers\BitMex\BitMexEntity\BitMexCandle.cs" />
     <Compile Include="Market\Servers\BitMex\BitMexServerPermission.cs" />
     <Compile Include="Market\Servers\ComparePositionsModule.cs" />
