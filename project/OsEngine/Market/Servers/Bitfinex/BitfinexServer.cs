@@ -2508,27 +2508,28 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             try
             {
+                Order orderOnMarket = null;
                 List<Order> ordersActive = GetAllActiveOrders();
                 List<Order> ordersHistory = GetHistoryOrders();
 
-                if (ordersActive == null || ordersHistory == null || ordersHistory.Count == 0)
+                if ((ordersActive == null || ordersActive.Count == 0) && (ordersHistory == null || ordersHistory.Count == 0))
                 {
-                    SendLogMessage("Failed to find order with NumberUser.", LogMessageType.Error);
+                    SendLogMessage("No active or historical orders found.", LogMessageType.Error);
                     return;
                 }
 
-                // Поиск ордера в истории
-                Order orderOnMarket = ordersHistory.FirstOrDefault(o => o.NumberUser == order.NumberUser);
-                  
 
-                // Если ордер найден в истории, искать в активных не нужно
-                if (orderOnMarket == null)
+                if (ordersActive != null) 
                 {
-                    // Поиск ордера в активных
                     orderOnMarket = ordersActive.FirstOrDefault(o => o.NumberUser == order.NumberUser);
-                       
                 }
-
+               if(ordersHistory != null)
+               {
+                  orderOnMarket = ordersHistory.FirstOrDefault(o => o.NumberUser == order.NumberUser); 
+               }
+                // Поиск ордера в истории
+               
+                
                 if (orderOnMarket == null)
                 {
                     SendLogMessage($"Order with NumberUser {order.NumberUser} not found.", LogMessageType.Error);
@@ -2542,101 +2543,7 @@ namespace OsEngine.Market.Servers.Bitfinex
                 SendLogMessage(exception.ToString(), LogMessageType.Error);
             }
         }
-        private Order GetActiveOrder(string numberMarket)
-        {
-            //long orderId = Convert.ToInt64(numberMarket);
-            int orderId = Convert.ToInt32(numberMarket);
-
-            // post https://api.bitfinex.com/v2/auth/r/orders
-
-            string nonce = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString();
-
-            List<Order> orders = new List<Order>();
-
-            string body = $"{{\"id\":[{orderId}]}}";
   
-            string _apiPath = "v2/auth/r/orders";
-
-            string signature = $"/api/{_apiPath}{nonce}{body}";
-
-            var client = new RestClient(_baseUrl);
-
-            var request = new RestRequest(_apiPath, Method.POST);
-            string sig = ComputeHmacSha384(_secretKey, signature);
-
-            request.AddHeader("accept", "application/json");
-            request.AddHeader("bfx-nonce", nonce);
-            request.AddHeader("bfx-apikey", _publicKey);
-            request.AddHeader("bfx-signature", sig);
-
-            request.AddParameter("application/json", body, ParameterType.RequestBody);
-
-            IRestResponse response = client.Execute(request);
-            Order activeOrder = new Order();
-            try
-            {
-                if (response.StatusCode == HttpStatusCode.OK)
-                {
-                    string responseBody = response.Content;
-                    if (responseBody.Contains("[]"))
-                    {
-                        SendLogMessage("Don't have active orders", LogMessageType.Trade);
-                    }
-
-                    List<List<object>> listOrders = JsonConvert.DeserializeObject<List<List<object>>>(response.Content);
-
-                    // List<BitfinexOrderData> activeOrders = new List<BitfinexOrderData>();
-
-                    //  if (orders != null && orders.Count > 0)
-                    if (listOrders == null)
-                    {
-                        return null;
-                    }
-
-                    for (int i = 0; i < listOrders.Count; i++)
-                    {
-
-
-                        var orderData = listOrders[i];
-
-                        activeOrder.TimeCallBack = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderData[5]));
-                        activeOrder.TimeCreate = TimeManager.GetDateTimeFromTimeStamp(Convert.ToInt64(orderData[4]));
-                        activeOrder.ServerType = ServerType.Bitfinex;
-                        activeOrder.SecurityNameCode = orderData[3].ToString();
-                        activeOrder.SecurityClassCode = orderData[3].ToString().StartsWith("f") ? "Futures" : "CurrencyPair";
-                        activeOrder.NumberUser = Convert.ToInt32(orderData[2]);
-                        activeOrder.NumberMarket = orderData[0].ToString();
-                        activeOrder.Side = (orderData[7]).ToString().ToDecimal() > 0 ? Side.Buy : Side.Sell; // SIDE activeOrders[i].Amount//orderData[6].Equals("-") ? Side.Sell : Side.Buy;
-                        activeOrder.State = GetOrderState(orderData[13].ToString());
-                        decimal volume = orderData[7].ToString().ToDecimal();
-
-                        if (volume < 0)
-                        {
-                            volume = Math.Abs(volume);
-                        }
-                        activeOrder.Volume = volume;
-                        activeOrder.Price = orderData[16].ToString().ToDecimal();
-                        activeOrder.PortfolioNumber = "BitfinexPortfolio";
-
-                        orders.Add(activeOrder);
-
-                        MyOrderEvent?.Invoke(orders[i]);
-                    }
-
-                }
-                else
-                {
-                    SendLogMessage($" Can't get all orders. State Code: {response.Content}", LogMessageType.Error);
-                }
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage(exception.ToString(), LogMessageType.Error);
-            }
-
-            return activeOrder;
-        }
-           
         public void GetAllActivOrders()
         {
             List<Order> orders = GetAllActiveOrders();
@@ -2651,7 +2558,7 @@ namespace OsEngine.Market.Servers.Bitfinex
             {
                
                 //orders[i].TimeCallBack = orders[i].TimeCallBack;
-                orders[i].State = (orders[i].State);
+                //orders[i].State = (orders[i].State);
 
                 MyOrderEvent?.Invoke(orders[i]);
             }
