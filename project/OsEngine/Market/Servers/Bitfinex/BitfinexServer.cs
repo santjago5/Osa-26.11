@@ -2508,7 +2508,7 @@ namespace OsEngine.Market.Servers.Bitfinex
 
             try
             {
-                Order orderOnMarket = null;
+               
                 List<Order> ordersActive = GetAllActiveOrders();
                 List<Order> ordersHistory = GetHistoryOrders();
 
@@ -2518,18 +2518,15 @@ namespace OsEngine.Market.Servers.Bitfinex
                     return;
                 }
 
+                // Поиск сначала в активных ордерах, если они есть
+                Order orderOnMarket = ordersActive?.FirstOrDefault(o => o.NumberUser == order.NumberUser);
 
-                if (ordersActive != null) 
+                // Если ордер не найден в активных и есть исполненные ордера, ищем там
+                if (orderOnMarket == null && ordersHistory != null && ordersHistory.Count > 0)
                 {
-                    orderOnMarket = ordersActive.FirstOrDefault(o => o.NumberUser == order.NumberUser);
+                    orderOnMarket = ordersHistory.FirstOrDefault(o => o.NumberUser == order.NumberUser);
                 }
-               if(ordersHistory != null)
-               {
-                  orderOnMarket = ordersHistory.FirstOrDefault(o => o.NumberUser == order.NumberUser); 
-               }
-                // Поиск ордера в истории
-               
-                
+
                 if (orderOnMarket == null)
                 {
                     SendLogMessage($"Order with NumberUser {order.NumberUser} not found.", LogMessageType.Error);
